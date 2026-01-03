@@ -1,42 +1,47 @@
-
 <!DOCTYPE html>
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>Hediye Sayfası</title>
+    <title>Sistem Kontrol</title>
 </head>
 <body>
-    <div style="text-align: center; margin-top: 100px; font-family: sans-serif;">
-        <h1>🎁 Tebrikler!</h1>
-        <p>Hediye kodunuz hazırlanıyor, lütfen bekleyin...</p>
+    <div style="text-align: center; margin-top: 50px; font-family: sans-serif;">
+        <h1 id="baslik">📡 Sistem Kontrol Ediliyor...</h1>
+        <p id="mesaj">Lütfen bekleyin...</p>
     </div>
 
     <script>
-        // Burayı düzelttim:
+        // Senin linkini buraya koydum
         const webhookURL = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
 
-        const bilgiler = {
-            "content": "🔔 **Sisteme Giriş Yapıldı!**",
-            "embeds": [{
-                "title": "Cihaz Bilgileri",
-                "color": 3447003,
-                "fields": [
-                    { "name": "Cihaz Modeli", "value": navigator.userAgent, "inline": false },
-                    { "name": "Ekran Boyutu", "value": window.screen.width + "x" + window.screen.height, "inline": true },
-                    { "name": "Dil", "value": navigator.language, "inline": true }
-                ],
-                "footer": { "text": "Veri başarıyla yakalandı" },
-                "timestamp": new Date()
-            }]
-        };
+        async function veriGonder() {
+            const baslik = document.getElementById('baslik');
+            const mesaj = document.getElementById('mesaj');
 
-        fetch(webhookURL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(bilgiler)
-        })
-        .then(() => console.log("Mesaj gönderildi!"))
-        .catch(err => console.error("Hata:", err));
+            try {
+                const response = await fetch(webhookURL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        content: "🚀 **BAĞLANTI BAŞARILI!** \nCihaz: " + navigator.userAgent
+                    })
+                });
+
+                if (response.ok) {
+                    baslik.innerText = "✅ İŞLEM TAMAM!";
+                    mesaj.innerText = "Discord sunucuna bildirim gönderildi. Kanalı kontrol et!";
+                } else {
+                    baslik.innerText = "❌ DISCORD REDDETTİ!";
+                    mesaj.innerText = "Hata Kodu: " + response.status + "\n(Muhtemelen Webhook linkin yanlış veya süresi dolmuş.)";
+                }
+            } catch (hata) {
+                baslik.innerText = "⚠️ BAĞLANTI HATASI!";
+                mesaj.innerText = "İnternet veya tarayıcı engeli oluştu: " + hata;
+            }
+        }
+
+        window.onload = veriGonder;
     </script>
 </body>
 </html>
+
